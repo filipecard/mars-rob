@@ -1,10 +1,10 @@
 {
   "name": "mars-rob",
   "version": "1.0.0",
-  "description": "Robô que se move numa malha 30x30 a partir de comandos de texto",
+  "description": "Robô que se move numa malha 31x31 a partir de comandos de texto",
   "scripts": {
-    "dev": "tsx src/main.ts ",
-    "build": "tsc",
+    "dev": "tsx src/main.ts",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",

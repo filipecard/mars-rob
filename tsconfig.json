@@ -1,8 +1,7 @@
 {
   "compilerOptions": {
-    // Estrutura de arquivos
-    "rootDir": "./src",
-    "outDir": "./dist",
+    // Só checagem de tipos (src + tests); o build usa tsconfig.build.json
+    "noEmit": true,
 
     // Ambiente
     "module": "nodenext",
@@ -30,5 +29,5 @@
     "moduleDetection": "force",
     "skipLibCheck": true
   },
-  "include": ["src"]
+  "include": ["src", "tests"]
 }
