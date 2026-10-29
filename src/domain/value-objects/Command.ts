@@ -1,23 +1,27 @@
 import { InvalidCommandError } from '../errors/InvalidCommandError.js';
 import { isDirection, type Direction } from './Direction.js';
+import { isTurn, type Turn } from './Orientation.js';
+
+// Um passo relativo (N, S, L, O) ou um giro (D, E), na ordem em que foi digitado
+export type Instruction = Direction | Turn;
 
 export class Command {
-  readonly directions: readonly Direction[];
+  readonly instructions: readonly Instruction[];
 
-  private constructor(directions: readonly Direction[]) {
-    this.directions = Object.freeze(directions);
+  private constructor(instructions: readonly Instruction[]) {
+    this.instructions = Object.freeze(instructions);
     Object.freeze(this);
   }
 
-  // RN07: só N, S, L, O maiúsculas, sem espaços; "" é um comando vazio válido
+  // RN07: só N, S, L, O, D, E maiúsculas, sem espaços; "" é um comando vazio válido
   static parse(input: string): Command {
-    const directions: Direction[] = [];
+    const instructions: Instruction[] = [];
     for (const char of input) {
-      if (!isDirection(char)) {
+      if (!isDirection(char) && !isTurn(char)) {
         throw new InvalidCommandError(input);
       }
-      directions.push(char);
+      instructions.push(char);
     }
-    return new Command(directions);
+    return new Command(instructions);
   }
 }

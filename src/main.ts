@@ -9,11 +9,11 @@ const moveRobot = new MoveRobot(new InMemoryRobotRepository());
 const rl = createInterface({ input: stdin, output: stdout, prompt: '> ' });
 
 console.log(
-    `Digite um comando (N, S, L, O) ou "${EXIT_COMMAND}" para encerrar.`,
+  `Digite um comando (passos N, S, L, O; giros D, E) ou "${EXIT_COMMAND}" para encerrar.`,
 );
 rl.prompt();
 await runCli(moveRobot, rl, (text) => {
-    console.log(text);
-    rl.prompt();
+  console.log(text);
+  rl.prompt();
 });
 rl.close();

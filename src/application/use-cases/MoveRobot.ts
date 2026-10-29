@@ -4,16 +4,20 @@ import { OutOfGridError } from '../../domain/errors/OutOfGridError.js';
 import { Command } from '../../domain/value-objects/Command.js';
 import type { RobotRepository } from '../ports/RobotRepository.js';
 
-export interface PositionDTO {
+// Espelha a Orientation do domínio: a apresentação não pode importar o domínio
+export type OrientationDTO = 'N' | 'L' | 'S' | 'O';
+
+export interface RobotStateDTO {
   x: number;
   y: number;
+  orientation: OrientationDTO;
 }
 
 export type MoveRobotError = 'INVALID_COMMAND' | 'OUT_OF_GRID';
 
 export type MoveRobotResult =
-  | { ok: true; position: PositionDTO }
-  | { ok: false; error: MoveRobotError; position: PositionDTO };
+  | { ok: true; robot: RobotStateDTO }
+  | { ok: false; error: MoveRobotError; robot: RobotStateDTO };
 
 export class MoveRobot {
   readonly #robots: RobotRepository;
@@ -28,18 +32,22 @@ export class MoveRobot {
       robot.execute(Command.parse(input));
     } catch (error) {
       if (error instanceof InvalidCommandError) {
-        return { ok: false, error: 'INVALID_COMMAND', position: toDTO(robot) };
+        return { ok: false, error: 'INVALID_COMMAND', robot: toDTO(robot) };
       }
       if (error instanceof OutOfGridError) {
-        return { ok: false, error: 'OUT_OF_GRID', position: toDTO(robot) };
+        return { ok: false, error: 'OUT_OF_GRID', robot: toDTO(robot) };
       }
       throw error;
     }
     await this.#robots.save(robot);
-    return { ok: true, position: toDTO(robot) };
+    return { ok: true, robot: toDTO(robot) };
   }
 }
 
-function toDTO(robot: Robot): PositionDTO {
-  return { x: robot.position.x, y: robot.position.y };
+function toDTO(robot: Robot): RobotStateDTO {
+  return {
+    x: robot.position.x,
+    y: robot.position.y,
+    orientation: robot.orientation,
+  };
 }
