@@ -1,3 +1,4 @@
+import { ObstacleError } from '../errors/ObstacleError.js';
 import { OutOfGridError } from '../errors/OutOfGridError.js';
 import type { Command } from '../value-objects/Command.js';
 import { step } from '../value-objects/Direction.js';
@@ -34,6 +35,9 @@ export class Robot {
     if (!grid.contains(position)) {
       throw new OutOfGridError(position);
     }
+    if (grid.isBlocked(position)) {
+      throw new ObstacleError(position);
+    }
     return new Robot(grid, position, orientation);
   }
 
@@ -46,7 +50,8 @@ export class Robot {
   }
 
   // Executa as instruções na ordem: cada passo usa a orientação deixada pelos giros anteriores.
-  // RN04: valida a cada passo. RN05: só atualiza posição e orientação se todos os passos forem válidos.
+  // RN04/RN09: valida limite e obstáculo a cada passo.
+  // RN05: só atualiza posição e orientação se todos os passos forem válidos.
   execute(command: Command): void {
     let position = this.#position;
     let orientation = this.#orientation;
@@ -58,6 +63,9 @@ export class Robot {
       position = step(position, toAbsolute(orientation, instruction));
       if (!this.grid.contains(position)) {
         throw new OutOfGridError(position);
+      }
+      if (this.grid.isBlocked(position)) {
+        throw new ObstacleError(position);
       }
     }
     this.#position = position;

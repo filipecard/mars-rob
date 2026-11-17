@@ -1,12 +1,23 @@
 import { describe, expect, it } from 'vitest';
+import { DescribeGrid } from '../../../src/application/use-cases/DescribeGrid.js';
 import { MoveRobot } from '../../../src/application/use-cases/MoveRobot.js';
 import { InMemoryRobotRepository } from '../../../src/infrastructure/repositories/InMemoryRobotRepository.js';
+import { Robot } from '../../../src/domain/entities/Robot.js';
+import { Grid } from '../../../src/domain/value-objects/Grid.js';
+import { Obstacle } from '../../../src/domain/value-objects/Obstacle.js';
+import { Position } from '../../../src/domain/value-objects/Position.js';
 import { runCli } from '../../../src/presentation/cli/runCli.js';
 
-async function run(lines: string[]): Promise<string[]> {
+async function run(
+  lines: string[],
+  repository = new InMemoryRobotRepository(),
+): Promise<string[]> {
   const output: string[] = [];
-  const moveRobot = new MoveRobot(new InMemoryRobotRepository());
-  await runCli(moveRobot, toAsyncIterable(lines), (text) => output.push(text));
+  const useCases = {
+    moveRobot: new MoveRobot(repository),
+    describeGrid: new DescribeGrid(repository),
+  };
+  await runCli(useCases, toAsyncIterable(lines), (text) => output.push(text));
   return output;
 }
 
@@ -43,6 +54,34 @@ describe('runCli', () => {
   it('para de ler ao receber "sair"', async () => {
     expect(await run(['N', 'sair', 'N'])).toEqual([
       'Posição atual (X: 0, Y: 1) para o Norte',
+    ]);
+  });
+
+  it('imprime onde está o obstáculo', async () => {
+    const repository = new InMemoryRobotRepository(
+      Robot.create(
+        Grid.square(15, [Obstacle.create([Position.create(-1, 3)])]),
+      ),
+    );
+
+    expect(await run(['NNNO'], repository)).toEqual([
+      'O robô não pode passar pelo obstáculo em (X: -1, Y: 3)',
+    ]);
+  });
+
+  it('"mapa" mostra o mapa com o robô e a legenda', async () => {
+    const repository = new InMemoryRobotRepository(
+      Robot.create(Grid.square(1, [Obstacle.create([Position.create(0, 1)])])),
+    );
+
+    expect(await run(['D', 'mapa'], repository)).toEqual([
+      'Posição atual (X: 0, Y: 0) para o Leste',
+      [
+        '. # .',
+        '. > .',
+        '. . .',
+        'Legenda: ^ > v < robô (para onde olha)   # obstáculo   . livre',
+      ].join('\n'),
     ]);
   });
 });

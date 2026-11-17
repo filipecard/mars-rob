@@ -1,0 +1,8 @@
+{
+  "limite": 15,
+  "obstaculos": {
+    "quantidade": 4,
+    "tamanhoMaximo": 4
+  },
+  "semente": null
+}

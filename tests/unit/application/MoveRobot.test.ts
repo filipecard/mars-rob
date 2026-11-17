@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MoveRobot } from '../../../src/application/use-cases/MoveRobot.js';
+import { Robot } from '../../../src/domain/entities/Robot.js';
+import { Grid } from '../../../src/domain/value-objects/Grid.js';
+import { Obstacle } from '../../../src/domain/value-objects/Obstacle.js';
+import { Position } from '../../../src/domain/value-objects/Position.js';
 import { InMemoryRobotRepository } from '../../../src/infrastructure/repositories/InMemoryRobotRepository.js';
 
 // Critérios de aceite de docs/requisitos.md, seção 6
@@ -111,6 +115,69 @@ describe('MoveRobot — critérios de aceite', () => {
     expect(await moveRobot.execute('N')).toEqual({
       ok: true,
       robot: { x: 1, y: 0, orientation: 'L' },
+    });
+  });
+});
+
+describe('MoveRobot — obstáculos e malha configurável', () => {
+  function moveRobotOn(grid: Grid): MoveRobot {
+    return new MoveRobot(new InMemoryRobotRepository(Robot.create(grid)));
+  }
+
+  // Obstáculo em (0,2) numa malha padrão
+  let moveRobot: MoveRobot;
+
+  beforeEach(() => {
+    moveRobot = moveRobotOn(
+      Grid.square(15, [Obstacle.create([Position.create(0, 2)])]),
+    );
+  });
+
+  it.each([
+    ['CA29', 'NN'],
+    ['CA30', 'NNN'],
+    ['CA31', 'DDSS'],
+  ])(
+    '%s — "%s" bate no obstáculo e o robô fica em (0,0) olhando N',
+    async (_ca, input) => {
+      expect(await moveRobot.execute(input)).toEqual({
+        ok: false,
+        error: 'OBSTACLE',
+        obstacle: { x: 0, y: 2 },
+        robot: { x: 0, y: 0, orientation: 'N' },
+      });
+    },
+  );
+
+  it('CA32 — o robô pode contornar o obstáculo', async () => {
+    expect(await moveRobot.execute('LNNNO')).toEqual({
+      ok: true,
+      robot: { x: 0, y: 3, orientation: 'N' },
+    });
+  });
+
+  it('CA33 — comando rejeitado por obstáculo mantém a posição anterior', async () => {
+    await moveRobot.execute('N');
+
+    expect(await moveRobot.execute('N')).toEqual({
+      ok: false,
+      error: 'OBSTACLE',
+      obstacle: { x: 0, y: 2 },
+      robot: { x: 0, y: 1, orientation: 'N' },
+    });
+  });
+
+  it('CA34 — numa malha de limite 5, o 6º passo sai da malha', async () => {
+    const small = moveRobotOn(Grid.square(5));
+
+    expect(await small.execute('N'.repeat(5))).toEqual({
+      ok: true,
+      robot: { x: 0, y: 5, orientation: 'N' },
+    });
+    expect(await small.execute('N')).toEqual({
+      ok: false,
+      error: 'OUT_OF_GRID',
+      robot: { x: 0, y: 5, orientation: 'N' },
     });
   });
 });

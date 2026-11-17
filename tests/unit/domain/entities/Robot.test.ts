@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { Robot } from '../../../../src/domain/entities/Robot.js';
+import { ObstacleError } from '../../../../src/domain/errors/ObstacleError.js';
 import { OutOfGridError } from '../../../../src/domain/errors/OutOfGridError.js';
 import { Command } from '../../../../src/domain/value-objects/Command.js';
 import { Grid } from '../../../../src/domain/value-objects/Grid.js';
+import { Obstacle } from '../../../../src/domain/value-objects/Obstacle.js';
 import { Position } from '../../../../src/domain/value-objects/Position.js';
 
 describe('Robot', () => {
@@ -95,5 +97,55 @@ describe('Robot', () => {
 
     expect(robot.position.equals(Position.create(1, 0))).toBe(true);
     expect(robot.orientation).toBe('L');
+  });
+
+  describe('obstáculos — RN09', () => {
+    const blocked = Grid.square(15, [Obstacle.create([Position.create(0, 2)])]);
+
+    it('não pode ser criado em cima de um obstáculo', () => {
+      expect(() => Robot.create(blocked, Position.create(0, 2))).toThrow(
+        ObstacleError,
+      );
+    });
+
+    it('rejeita o comando inteiro ao bater no obstáculo — RN05', () => {
+      const robot = Robot.create(blocked);
+
+      expect(() => {
+        robot.execute(Command.parse('DDSS'));
+      }).toThrow(ObstacleError);
+      expect(robot.position.equals(Position.origin())).toBe(true);
+      expect(robot.orientation).toBe('N');
+    });
+
+    it('não pode atravessar o obstáculo nem que pare depois dele', () => {
+      const robot = Robot.create(blocked);
+
+      expect(() => {
+        robot.execute(Command.parse('NNNN'));
+      }).toThrow(ObstacleError);
+    });
+
+    it('informa onde está o obstáculo', () => {
+      const robot = Robot.create(blocked);
+
+      try {
+        robot.execute(Command.parse('DDSS'));
+        expect.unreachable();
+      } catch (error) {
+        expect(error).toBeInstanceOf(ObstacleError);
+        expect(
+          (error as ObstacleError).position.equals(Position.create(0, 2)),
+        ).toBe(true);
+      }
+    });
+
+    it('pode contornar o obstáculo', () => {
+      const robot = Robot.create(blocked);
+
+      robot.execute(Command.parse('NLNNO'));
+
+      expect(robot.position.equals(Position.create(0, 3))).toBe(true);
+    });
   });
 });
