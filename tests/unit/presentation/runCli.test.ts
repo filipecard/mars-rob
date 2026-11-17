@@ -80,8 +80,28 @@ describe('runCli', () => {
         '. # .',
         '. > .',
         '. . .',
-        'Legenda: ^ > v < robô (para onde olha)   # obstáculo   . livre',
+        'Explorado: 9 de 9 casas',
+        'Legenda: ^ > v < robô (para onde olha)   # obstáculo   . livre   ? desconhecido',
       ].join('\n'),
+    ]);
+  });
+
+  it('"mapa" revela o caminho percorrido e mantém o resto desconhecido — RN12', async () => {
+    const repository = new InMemoryRobotRepository(
+      Robot.create(Grid.square(3)),
+    );
+
+    const [, map] = await run(['LL', 'mapa'], repository);
+
+    expect(map?.split('\n').slice(0, 8)).toEqual([
+      '? ? ? ? ? ? ?',
+      '? ? ? ? ? ? ?',
+      '? ? . . . . .',
+      '? ? . . . ^ .',
+      '? ? . . . . .',
+      '? ? ? ? ? ? ?',
+      '? ? ? ? ? ? ?',
+      'Explorado: 15 de 49 casas',
     ]);
   });
 });

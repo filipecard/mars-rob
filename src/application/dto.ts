@@ -16,11 +16,16 @@ export interface RobotStateDTO extends PositionDTO {
   orientation: OrientationDTO;
 }
 
+export interface CellDTO extends PositionDTO {
+  blocked: boolean;
+}
+
+// RN12: só o que o robô já viu. O resto da malha é desconhecido para quem está de fora.
 export interface GridDTO {
   min: number;
   max: number;
-  // Cada obstáculo é a lista das células que ele ocupa
-  obstacles: PositionDTO[][];
+  obstacleCount: number;
+  explored: CellDTO[];
   robot: RobotStateDTO;
 }
 
@@ -36,9 +41,11 @@ export function toGridDTO(grid: Grid, robot: Robot): GridDTO {
   return {
     min: grid.min,
     max: grid.max,
-    obstacles: grid.obstacles.map((obstacle) =>
-      obstacle.cells.map(toPositionDTO),
-    ),
+    obstacleCount: grid.obstacles.length,
+    explored: robot.explored.map((cell) => ({
+      ...toPositionDTO(cell),
+      blocked: grid.isBlocked(cell),
+    })),
     robot: toRobotStateDTO(robot),
   };
 }

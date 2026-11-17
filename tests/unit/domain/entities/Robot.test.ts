@@ -148,4 +148,88 @@ describe('Robot', () => {
       expect(robot.position.equals(Position.create(0, 3))).toBe(true);
     });
   });
+
+  describe('exploração — RN12', () => {
+    const keys = (robot: Robot): string[] =>
+      robot.explored.map(({ x, y }) => `${String(x)},${String(y)}`).sort();
+
+    // Quadrado de visão em volta de (cx, cy), cortado nos limites
+    function square(cx: number, cy: number, limit = 15): string[] {
+      const result: string[] = [];
+      for (let x = cx - 1; x <= cx + 1; x++) {
+        for (let y = cy - 1; y <= cy + 1; y++) {
+          if (Math.abs(x) <= limit && Math.abs(y) <= limit) {
+            result.push(`${String(x)},${String(y)}`);
+          }
+        }
+      }
+      return result;
+    }
+
+    const union = (...areas: string[][]): string[] =>
+      [...new Set(areas.flat())].sort();
+
+    it('ao ser criado vê a própria casa e as 8 em volta', () => {
+      const robot = Robot.create(grid);
+
+      expect(keys(robot)).toEqual(union(square(0, 0)));
+      expect(robot.hasExplored(Position.create(1, 1))).toBe(true);
+      expect(robot.hasExplored(Position.create(2, 0))).toBe(false);
+    });
+
+    it('revela a vizinhança de cada casa do caminho, não só do destino', () => {
+      const robot = Robot.create(grid);
+
+      robot.execute(Command.parse('NNN'));
+
+      expect(keys(robot)).toEqual(
+        union(square(0, 0), square(0, 1), square(0, 2), square(0, 3)),
+      );
+    });
+
+    it('girar não revela nada novo', () => {
+      const robot = Robot.create(grid);
+
+      robot.execute(Command.parse('DDDE'));
+
+      expect(keys(robot)).toEqual(union(square(0, 0)));
+    });
+
+    it('a exploração se acumula entre comandos', () => {
+      const robot = Robot.create(grid);
+
+      robot.execute(Command.parse('LL'));
+      robot.execute(Command.parse('OOOO'));
+
+      expect(keys(robot)).toEqual(
+        union(...[-2, -1, 0, 1, 2].map((x) => square(x, 0))),
+      );
+    });
+
+    it('comando rejeitado não revela nada — RN05', () => {
+      const robot = Robot.create(grid);
+
+      expect(() => {
+        robot.execute(Command.parse('N'.repeat(16)));
+      }).toThrow(OutOfGridError);
+      expect(keys(robot)).toEqual(union(square(0, 0)));
+    });
+
+    it('não revela casas fora da malha', () => {
+      const robot = Robot.create(grid, Position.create(15, 15));
+
+      expect(keys(robot)).toEqual(union(square(15, 15)));
+      expect(robot.explored).toHaveLength(4);
+    });
+
+    it('enxerga obstáculos vizinhos sem precisar bater neles', () => {
+      const withObstacle = Grid.square(15, [
+        Obstacle.create([Position.create(1, 1)]),
+      ]);
+
+      const robot = Robot.create(withObstacle);
+
+      expect(robot.hasExplored(Position.create(1, 1))).toBe(true);
+    });
+  });
 });

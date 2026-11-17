@@ -5,20 +5,27 @@ import { formatWelcome } from '../../../src/presentation/cli/formatWelcome.js';
 const robot = { x: 0, y: 0, orientation: 'N' } as const;
 
 describe('formatWelcome', () => {
-  it('mostra a malha, a semente, o mapa e os comandos', () => {
+  it('mostra a malha, a semente, o mapa explorado e os comandos', () => {
     const grid: GridDTO = {
-      min: -1,
-      max: 1,
-      obstacles: [[{ x: 1, y: 0 }]],
+      min: -2,
+      max: 2,
+      obstacleCount: 1,
+      explored: [
+        { x: 0, y: 0, blocked: false },
+        { x: 1, y: 0, blocked: true },
+      ],
       robot,
     };
 
     expect(formatWelcome(grid, 42).split('\n')).toEqual([
-      'Malha de -1 a 1 nos dois eixos, 1 obstáculo (semente 42).',
-      '. . .',
-      '. ^ #',
-      '. . .',
-      'Legenda: ^ > v < robô (para onde olha)   # obstáculo   . livre',
+      'Malha de -2 a 2 nos dois eixos, 1 obstáculo (semente 42).',
+      '? ? ? ? ?',
+      '? ? ? ? ?',
+      '? ? ^ # ?',
+      '? ? ? ? ?',
+      '? ? ? ? ?',
+      'Explorado: 2 de 25 casas',
+      'Legenda: ^ > v < robô (para onde olha)   # obstáculo   . livre   ? desconhecido',
       'Digite um comando (passos N, S, L, O; giros D, E), "mapa" para ver o mapa ou "sair" para encerrar.',
     ]);
   });
@@ -30,7 +37,8 @@ describe('formatWelcome', () => {
     const grid: GridDTO = {
       min: -15,
       max: 15,
-      obstacles: Array.from({ length: count }, (_, i) => [{ x: i, y: 5 }]),
+      obstacleCount: count,
+      explored: [],
       robot,
     };
 

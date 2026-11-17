@@ -1,6 +1,6 @@
 import type { DescribeGrid } from '../../application/use-cases/DescribeGrid.js';
 import type { MoveRobot } from '../../application/use-cases/MoveRobot.js';
-import { formatMap, MAP_LEGEND } from './formatMap.js';
+import { formatMapView } from './formatMap.js';
 import { formatResult } from './formatResult.js';
 
 export const EXIT_COMMAND = 'sair';
@@ -21,7 +21,7 @@ export async function runCli(
       return;
     }
     if (line === MAP_COMMAND) {
-      print(`${formatMap(await describeGrid.execute())}\n${MAP_LEGEND}`);
+      print(formatMapView(await describeGrid.execute()));
       continue;
     }
     print(formatResult(await moveRobot.execute(line)));

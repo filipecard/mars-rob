@@ -10,6 +10,7 @@ nova posição e orientação do robô ou com o motivo da rejeição.
 
 - **Malha (Grid):** área quadrada onde o robô se move, de -limite a limite (inclusive) nos dois eixos, com a origem (0,0) no centro. O limite padrão é 15 (31x31 posições). Substitui os termos "região" e "planeta". O norte da malha é fixo: y+1 é sempre Norte.
 - **Obstáculo:** bloco de 1 ou mais posições ligadas pelos lados (reta, L, T, Z, quadrado...), por onde o robô não pode passar. É gerado aleatoriamente ao iniciar o programa.
+- **Visão / exploração:** o robô enxerga a casa onde está e 1 casa em todas as direções, inclusive diagonais (um quadrado 3x3). Casas que ele já viu ficam exploradas; o resto da malha é desconhecido.
 - **Semente:** número que define o sorteio dos obstáculos. A mesma semente com a mesma configuração gera sempre o mesmo mapa.
 - **Posição (Position):** par de coordenadas inteiras (x, y) dentro da malha.
 - **Orientação (Orientation):** para onde o robô está virado: `N`, `L`, `S` ou `O`, em relação ao norte da malha.
@@ -31,6 +32,7 @@ nova posição e orientação do robô ou com o motivo da rejeição.
 - **RN09** — Obstáculos: o robô não pode parar num obstáculo nem atravessá-lo. Assim como o limite (RN04), isso é validado a cada passo, e o comando inteiro é rejeitado (RN05).
 - **RN10** — Geração dos obstáculos: ao iniciar, o programa sorteia exatamente `quantidade` obstáculos. O tamanho de cada um é sorteado de 1 a `tamanhoMaximo` posições, e o formato é sorteado também: o obstáculo cresce a partir de uma posição para vizinhos (pelos lados) escolhidos ao acaso, o que gera retas, L, T, Z, quadrados etc. Obstáculos não se sobrepõem nem se encostam (nem na diagonal).
 - **RN11** — Acesso garantido: os obstáculos nunca podem impedir o robô de chegar a qualquer posição livre. A origem e os 4 cantos ficam sempre livres, e toda posição livre é alcançável a partir de qualquer outra. Assim o robô sempre consegue chegar aos 4 lados (cima, baixo, esquerda e direita) e aos 4 cantos. Se a configuração não couber na malha sem bloquear o caminho, o programa mostra o erro e encerra com código 1.
+- **RN12** — Mapa escuro: o mapa começa desconhecido e mostra só o que o robô já viu. Ao ser criado, ele vê a vizinhança 3x3 da origem. Em cada passo de um comando aceito, ele vê a vizinhança 3x3 da casa onde está, então todo o caminho é revelado, e não só o destino. Giros não revelam nada. Comando rejeitado não revela nada, porque o robô não saiu do lugar (RN05). Casas fora da malha não contam. Obstáculos dentro da visão aparecem no mapa, mesmo sem o robô bater neles. A exploração se acumula entre comandos.
 
 ## 4. Formato da entrada
 
@@ -68,15 +70,15 @@ Configuração inválida (chave com valor errado, JSON inválido, arquivo inform
 - Erro de limite da malha: `O robô não pode sair do limite da malha`
 - Erro de obstáculo: `O robô não pode passar pelo obstáculo em (X: 0, Y: 2)`
 - Ao iniciar: resumo (`Malha de -15 a 15 nos dois eixos, 4 obstáculos (semente 123).`), o mapa e a legenda.
-- Comando `mapa`: mostra o mapa de novo, com a posição e a orientação atuais do robô.
-- Mapa: Norte para cima; `^ > v <` é o robô olhando para N, L, S, O; `#` é obstáculo; `.` é livre. Exemplo de malha com limite 2:
+- Comando `mapa`: mostra o mapa de novo, com a posição e a orientação atuais do robô e quanto foi explorado (`Explorado: 15 de 961 casas`).
+- Mapa: Norte para cima; `^ > v <` é o robô olhando para N, L, S, O; `#` é obstáculo; `.` é livre; `?` é desconhecido (RN12). Exemplo de malha com limite 2, logo no início, com um obstáculo visto em (1,1):
 
 ```
-. . . . .
-. # # # .
-. . ^ . .
-. . . # .
-. . . # .
+? ? ? ? ?
+? . . # ?
+? . ^ . ?
+? . . . ?
+? ? ? ? ?
 ```
 
 ## 6. Critérios de aceite
@@ -136,6 +138,18 @@ Geração dos obstáculos (verificada com várias sementes):
 | CA39 | RN10  | mesma semente duas vezes          | o mesmo mapa                                                            |
 | CA40 | RN10  | quantidade 0                      | malha sem obstáculos                                                    |
 | CA41 | RN11  | limite 1, quantidade 10           | erro: não há espaço; o programa encerra                                 |
+
+Mapa escuro (malha com limite 3, sem obstáculos, salvo indicação):
+
+| CA   | Regra      | Dado                    | Quando                   | Então                                                     |
+| ---- | ---------- | ----------------------- | ------------------------ | --------------------------------------------------------- |
+| CA42 | RN12       | início                  | `"mapa"`                 | só o 3x3 em volta da origem aparece; o resto é `?`        |
+| CA43 | RN12       | (0,0)                   | `"NNN"`                  | revela o 3x3 de (0,1), (0,2) e (0,3), não só do destino   |
+| CA44 | RN12       | (0,0)                   | `"DDDE"`                 | nada novo é revelado                                      |
+| CA45 | RN05, RN12 | (0,0)                   | comando que sai da malha | nada novo é revelado                                      |
+| CA46 | RN12       | (15,15) na malha padrão | início                   | só 4 casas exploradas (o resto do 3x3 está fora da malha) |
+| CA47 | RN12       | obstáculo em (1,1)      | início                   | o obstáculo aparece como `#` sem o robô bater nele        |
+| CA48 | RN12       | (0,0)                   | `"LL"` e depois `"mapa"` | `Explorado: 15 de 49 casas`                               |
 
 ## 7. Fora do escopo
 

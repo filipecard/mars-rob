@@ -55,7 +55,9 @@ O robô começa em (0,0), olhando para o Norte. Cada linha digitada é um comand
 
 Exemplo: `DNNE` gira para o Leste, anda 2 casas e volta a olhar para o Norte.
 
-No mapa, `^ > v <` é o robô (para onde ele olha), `#` é obstáculo e `.` é casa livre.
+O mapa começa **escuro**: o robô só enxerga a casa onde está e 1 casa em volta (inclusive diagonais),
+e o mapa revela apenas o que ele já viu pelo caminho. No mapa, `^ > v <` é o robô (para onde ele olha),
+`#` é obstáculo, `.` é casa livre e `?` é desconhecido.
 
 O comando é atômico: se algum passo sair da malha ou bater num obstáculo, o comando
 inteiro é rejeitado e o robô fica onde estava.
