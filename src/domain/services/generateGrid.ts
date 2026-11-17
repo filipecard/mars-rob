@@ -1,9 +1,8 @@
 import { allFreeCellsConnected, corners, Grid } from '../value-objects/Grid.js';
 import { keyOf, Obstacle, sideNeighbors } from '../value-objects/Obstacle.js';
 import { Position } from '../value-objects/Position.js';
+import type { Random } from './random.js';
 
-// Fonte de aleatoriedade: devolve um número em [0, 1), como Math.random
-export type Random = () => number;
 
 export interface ObstacleSettings {
   count: number;

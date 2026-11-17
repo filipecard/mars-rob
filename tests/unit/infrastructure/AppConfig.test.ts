@@ -17,12 +17,18 @@ describe('parseConfig', () => {
     expect(
       parseConfig({
         limite: 10,
+        robos: 4,
         obstaculos: { quantidade: 6, tamanhoMaximo: 3 },
         semente: 42,
       }),
     ).toEqual({
       ok: true,
-      config: { limit: 10, obstacles: { count: 6, maxSize: 3 }, seed: 42 },
+      config: {
+        limit: 10,
+        robots: 4,
+        obstacles: { count: 6, maxSize: 3 },
+        seed: 42,
+      },
     });
   });
 
@@ -48,6 +54,9 @@ describe('parseConfig', () => {
     [{ limite: 0 }, '"limite"'],
     [{ limite: '15' }, '"limite"'],
     [{ limite: 2.5 }, '"limite"'],
+    [{ robos: 0 }, '"robos" deve ser um inteiro de 1 a 5'],
+    [{ robos: 6 }, '"robos"'],
+    [{ robos: '2' }, '"robos"'],
     [{ obstaculos: 4 }, '"obstaculos" deve ser um objeto'],
     [{ obstaculos: { quantidade: -1 } }, '"obstaculos.quantidade"'],
     [{ obstaculos: { tamanhoMaximo: 0 } }, '"obstaculos.tamanhoMaximo"'],

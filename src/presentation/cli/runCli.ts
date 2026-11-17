@@ -1,18 +1,26 @@
-import type { DescribeGrid } from '../../application/use-cases/DescribeGrid.js';
-import type { MoveRobot } from '../../application/use-cases/MoveRobot.js';
+import type { DescribeFleet } from '../../application/use-cases/DescribeFleet.js';
+import type { DescribeMap } from '../../application/use-cases/DescribeMap.js';
+import type { ExecuteOrders } from '../../application/use-cases/ExecuteOrders.js';
 import { formatMapView } from './formatMap.js';
-import { formatResult } from './formatResult.js';
+import { formatFleet, formatOrderResult } from './formatResult.js';
 
 export const EXIT_COMMAND = 'sair';
 export const MAP_COMMAND = 'mapa';
+export const ROBOTS_COMMAND = 'robos';
+
+export const MAP_USAGE = `Use "${MAP_COMMAND} ID" para ver o mapa de um robô, ex.: ${MAP_COMMAND} 1`;
+
+const MAP_PATTERN = new RegExp(`^${MAP_COMMAND}(?:\\s+(.*))?$`);
+const ID_PATTERN = /^[1-9]\d*$/;
 
 export interface CliUseCases {
-  moveRobot: MoveRobot;
-  describeGrid: DescribeGrid;
+  executeOrders: ExecuteOrders;
+  describeFleet: DescribeFleet;
+  describeMap: DescribeMap;
 }
 
 export async function runCli(
-  { moveRobot, describeGrid }: CliUseCases,
+  useCases: CliUseCases,
   lines: AsyncIterable<string>,
   print: (text: string) => void,
 ): Promise<void> {
@@ -20,10 +28,32 @@ export async function runCli(
     if (line === EXIT_COMMAND) {
       return;
     }
-    if (line === MAP_COMMAND) {
-      print(formatMapView(await describeGrid.execute()));
-      continue;
+    const output = await respond(useCases, line);
+    if (output !== '') {
+      print(output);
     }
-    print(formatResult(await moveRobot.execute(line)));
   }
+}
+
+async function respond(
+  { executeOrders, describeFleet, describeMap }: CliUseCases,
+  line: string,
+): Promise<string> {
+  if (line === ROBOTS_COMMAND) {
+    return formatFleet(await describeFleet.execute());
+  }
+  const map = MAP_PATTERN.exec(line);
+  if (map !== null) {
+    const id = map[1]?.trim() ?? '';
+    if (!ID_PATTERN.test(id)) {
+      return MAP_USAGE;
+    }
+    const result = await describeMap.execute(Number(id));
+    return result.ok
+      ? formatMapView(result.map)
+      : `Não existe robô com ID ${String(result.robotId)}`;
+  }
+  // Linha vazia: nenhuma ordem, nada a mostrar
+  const results = await executeOrders.execute(line);
+  return results.map(formatOrderResult).join('\n');
 }

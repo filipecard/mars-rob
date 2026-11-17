@@ -1,15 +1,16 @@
 import process, { argv, stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline';
-import { DescribeGrid } from './application/use-cases/DescribeGrid.js';
-import { MoveRobot } from './application/use-cases/MoveRobot.js';
-import { Robot } from './domain/entities/Robot.js';
+import { DescribeFleet } from './application/use-cases/DescribeFleet.js';
+import { DescribeMap } from './application/use-cases/DescribeMap.js';
+import { ExecuteOrders } from './application/use-cases/ExecuteOrders.js';
+import { Fleet } from './domain/entities/Fleet.js';
 import { generateGrid } from './domain/services/generateGrid.js';
 import { loadConfig } from './infrastructure/config/AppConfig.js';
 import {
   randomSeed,
   seededRandom,
 } from './infrastructure/random/seededRandom.js';
-import { InMemoryRobotRepository } from './infrastructure/repositories/InMemoryRobotRepository.js';
+import { InMemoryFleetRepository } from './infrastructure/repositories/InMemoryFleetRepository.js';
 import { formatWelcome } from './presentation/cli/formatWelcome.js';
 import { parseCliArgs } from './presentation/cli/parseCliArgs.js';
 import { runCli } from './presentation/cli/runCli.js';
@@ -32,23 +33,28 @@ const { config } = loaded;
 
 // Sem semente no arquivo, sorteia uma e mostra na tela para o mapa poder ser repetido
 const seed = config.seed ?? randomSeed();
-let robot: Robot;
+let fleet: Fleet;
 try {
-  robot = Robot.create(
-    generateGrid(config.limit, config.obstacles, seededRandom(seed)),
+  // A mesma semente sorteia os obstáculos e depois onde os robôs nascem
+  const random = seededRandom(seed);
+  fleet = Fleet.create(
+    generateGrid(config.limit, config.obstacles, random),
+    config.robots,
+    random,
   );
 } catch (error) {
   exitWithError(`Configuração inválida: ${(error as Error).message}`);
 }
 
-const repository = new InMemoryRobotRepository(robot);
+const repository = new InMemoryFleetRepository(fleet);
 const useCases = {
-  moveRobot: new MoveRobot(repository),
-  describeGrid: new DescribeGrid(repository),
+  executeOrders: new ExecuteOrders(repository),
+  describeFleet: new DescribeFleet(repository),
+  describeMap: new DescribeMap(repository),
 };
 const rl = createInterface({ input: stdin, output: stdout, prompt: '> ' });
 
-console.log(formatWelcome(await useCases.describeGrid.execute(), seed));
+console.log(formatWelcome(await useCases.describeFleet.execute(), seed));
 rl.prompt();
 await runCli(useCases, rl, (text) => {
   console.log(text);

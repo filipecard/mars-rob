@@ -1,4 +1,4 @@
-import type { Random } from '../../domain/services/generateGrid.js';
+import type { Random } from '../../domain/services/random.js';
 
 export const MAX_SEED = 2 ** 32 - 1;
 

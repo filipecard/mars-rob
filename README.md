@@ -2,7 +2,8 @@
 
 [![CI](https://github.com/filipecard/mars-rob/actions/workflows/ci.yml/badge.svg)](https://github.com/filipecard/mars-rob/actions/workflows/ci.yml)
 
-Robô controlado por comandos de texto numa malha quadrada, com obstáculos sorteados.
+Até 5 robôs controlados por comandos de texto numa malha quadrada, com obstáculos sorteados
+e mapa escuro: cada robô só conhece o que já viu, e os robôs podem trocar mapas entre si.
 É um projeto de estudo de **TypeScript**, **Clean Architecture** e **TDD**.
 
 ## Como rodar
@@ -21,6 +22,7 @@ Tudo fica em `mars-rob.config.json` (para usar outro arquivo: `npm run dev -- --
 ```json
 {
   "limite": 15,
+  "robos": 3,
   "obstaculos": { "quantidade": 4, "tamanhoMaximo": 4 },
   "semente": null
 }
@@ -29,6 +31,7 @@ Tudo fica em `mars-rob.config.json` (para usar outro arquivo: `npm run dev -- --
 | Chave                      | O que faz                                                            | Padrão |
 | -------------------------- | -------------------------------------------------------------------- | ------ |
 | `limite`                   | a malha vai de `-limite` a `limite` nos dois eixos                   | `15`   |
+| `robos`                    | quantos robôs (de 1 a 5)                                             | `1`    |
 | `obstaculos.quantidade`    | quantos obstáculos sortear                                           | `4`    |
 | `obstaculos.tamanhoMaximo` | cada obstáculo tem de 1 até este número de casas                     | `4`    |
 | `semente`                  | `null` sorteia um mapa novo a cada execução; um número repete o mapa | `null` |
@@ -40,27 +43,50 @@ A semente usada aparece na tela; coloque-a em `"semente"` para repetir o mesmo m
 
 ## Comandos
 
-O robô começa em (0,0), olhando para o Norte. Cada linha digitada é um comando:
+Os robôs têm IDs 1, 2, 3... e nascem, nessa ordem, na origem (0,0) e nos cantos: superior
+esquerdo, superior direito, inferior esquerdo e inferior direito. Todos começam olhando para o Norte.
 
-| Letra  | Efeito                   |
-| ------ | ------------------------ |
-| `N`    | um passo para a frente   |
-| `S`    | um passo para trás       |
-| `L`    | um passo para a direita  |
-| `O`    | um passo para a esquerda |
-| `D`    | gira 90° para a direita  |
-| `E`    | gira 90° para a esquerda |
-| `mapa` | mostra o mapa            |
-| `sair` | encerra o programa       |
+Cada linha digitada tem uma ou mais **ordens**, separadas por espaço, executadas da esquerda para a direita:
 
-Exemplo: `DNNE` gira para o Leste, anda 2 casas e volta a olhar para o Norte.
+| Ordem         | Efeito                                                         | Exemplo  |
+| ------------- | -------------------------------------------------------------- | -------- |
+| `ID:COMANDOS` | o robô `ID` executa os comandos                                | `1:NNDE` |
+| `DE>PARA`     | o robô `DE` envia o mapa dele para o robô `PARA` (lado a lado) | `1>2`    |
 
-O mapa começa **escuro**: o robô só enxerga a casa onde está e 1 casa em volta (inclusive diagonais),
-e o mapa revela apenas o que ele já viu pelo caminho. No mapa, `^ > v <` é o robô (para onde ele olha),
-`#` é obstáculo, `.` é casa livre e `?` é desconhecido.
+Exemplo: `1:NN 2:DE 1>2` move o robô 1, gira o robô 2 e depois o 1 envia o mapa para o 2.
+Cada ordem é independente: se uma for rejeitada, as outras continuam valendo.
 
-O comando é atômico: se algum passo sair da malha ou bater num obstáculo, o comando
+Letras dos comandos:
+
+| Letra | Efeito                   |
+| ----- | ------------------------ |
+| `N`   | um passo para a frente   |
+| `S`   | um passo para trás       |
+| `L`   | um passo para a direita  |
+| `O`   | um passo para a esquerda |
+| `D`   | gira 90° para a direita  |
+| `E`   | gira 90° para a esquerda |
+
+Exemplo: `1:DNNE` gira o robô 1 para o Leste, anda 2 casas e volta a olhar para o Norte.
+
+Comandos do sistema:
+
+| Comando   | Efeito                     |
+| --------- | -------------------------- |
+| `mapa ID` | mostra o mapa do robô `ID` |
+| `robos`   | mostra onde está cada robô |
+| `sair`    | encerra o programa         |
+
+O mapa começa **escuro** e **cada robô tem o seu**: ele só enxerga a casa onde está e 1 casa em volta
+(inclusive diagonais), e o mapa dele revela apenas o que ele já viu pelo caminho. Quando dois robôs estão
+lado a lado (vizinhos pelos lados, sem diagonal), um pode enviar o mapa para o outro com `DE>PARA`; para
+trocar nos dois sentidos, use `1>2 2>1`. No mapa, `^ > v <` é o dono do mapa (para onde ele olha), um número
+é outro robô (só aparece se estiver numa casa conhecida), `#` é obstáculo, `.` é casa livre e `?` é desconhecido.
+
+O comando é atômico: se algum passo sair da malha, bater num obstáculo ou passar por outro robô, o comando
 inteiro é rejeitado e o robô fica onde estava.
+
+Outras ideias para evoluir o projeto estão em [docs/ideias.md](docs/ideias.md).
 
 As regras completas e os critérios de aceite estão em [docs/requisitos.md](docs/requisitos.md).
 
@@ -68,8 +94,8 @@ As regras completas e os critérios de aceite estão em [docs/requisitos.md](doc
 
 ```
 src/
-├── domain/          # regras de negócio puras (Robot, Grid, Obstacle, Position, Command, gerador de obstáculos)
-├── application/     # casos de uso MoveRobot e DescribeGrid, DTOs e a porta RobotRepository
+├── domain/          # regras de negócio puras (Fleet, Robot, Grid, Obstacle, Position, Command, Order, gerador de obstáculos)
+├── application/     # casos de uso ExecuteOrders, DescribeFleet e DescribeMap, DTOs e a porta FleetRepository
 ├── infrastructure/  # repositório em memória, arquivo de configuração e sorteio com semente
 ├── presentation/    # CLI: argumentos, laço de comandos, mapa e formatação da saída
 └── main.ts          # composition root: o único lugar que liga todas as camadas

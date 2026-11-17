@@ -1,13 +1,10 @@
 import type {
+  FleetDTO,
   OrientationDTO,
   PositionDTO,
   RobotStateDTO,
 } from '../../application/dto.js';
-import type { MoveRobotResult } from '../../application/use-cases/MoveRobot.js';
-
-const INVALID_COMMAND_MESSAGE =
-  'Tipo de entrada inválido, permitido apenas as letras (N,S,L,O,D,E)';
-const OUT_OF_GRID_MESSAGE = 'O robô não pode sair do limite da malha';
+import type { OrderResult } from '../../application/use-cases/ExecuteOrders.js';
 
 const ORIENTATION_NAMES: Record<OrientationDTO, string> = {
   N: 'Norte',
@@ -20,20 +17,44 @@ export function formatPosition({ x, y }: PositionDTO): string {
   return `(X: ${String(x)}, Y: ${String(y)})`;
 }
 
+const robotName = (id: number): string => `Robô ${String(id)}`;
+
 export function formatRobotState(robot: RobotStateDTO): string {
-  return `Posição atual ${formatPosition(robot)} para o ${ORIENTATION_NAMES[robot.orientation]}`;
+  return `${robotName(robot.id)}: posição atual ${formatPosition(robot)} para o ${ORIENTATION_NAMES[robot.orientation]}`;
 }
 
-export function formatResult(result: MoveRobotResult): string {
+// Uma linha por robô
+export function formatFleet({ robots }: FleetDTO): string {
+  return robots.map(formatRobotState).join('\n');
+}
+
+function formatNewCells(count: number): string {
+  if (count === 0) {
+    return 'nenhuma casa nova';
+  }
+  return count === 1 ? '1 casa nova' : `${String(count)} casas novas`;
+}
+
+export function formatOrderResult(result: OrderResult): string {
   if (result.ok) {
-    return formatRobotState(result.robot);
+    return result.kind === 'move'
+      ? formatRobotState(result.robot)
+      : `${robotName(result.from)} enviou o mapa para o robô ${String(result.to)}: ${formatNewCells(result.added)}`;
   }
   switch (result.error) {
+    case 'INVALID_ORDER':
+      return `Ordem inválida "${result.input}": use ID:COMANDOS (ex.: 1:NNDE) ou DE>PARA (ex.: 1>2)`;
     case 'INVALID_COMMAND':
-      return INVALID_COMMAND_MESSAGE;
+      return `Comando inválido em "${result.input}", permitido apenas as letras (N,S,L,O,D,E)`;
+    case 'UNKNOWN_ROBOT':
+      return `Não existe robô com ID ${String(result.robotId)}`;
     case 'OUT_OF_GRID':
-      return OUT_OF_GRID_MESSAGE;
+      return `${robotName(result.robot.id)}: não pode sair do limite da malha`;
     case 'OBSTACLE':
-      return `O robô não pode passar pelo obstáculo em ${formatPosition(result.obstacle)}`;
+      return `${robotName(result.robot.id)}: não pode passar pelo obstáculo em ${formatPosition(result.obstacle)}`;
+    case 'COLLISION':
+      return `${robotName(result.robot.id)}: não pode passar pelo robô ${String(result.other)} em ${formatPosition(result.at)}`;
+    case 'NOT_ADJACENT':
+      return `Os robôs ${String(result.from)} e ${String(result.to)} precisam estar lado a lado para compartilhar o mapa`;
   }
 }

@@ -1,5 +1,6 @@
 {
   "limite": 15,
+  "robos": 3,
   "obstaculos": {
     "quantidade": 6,
     "tamanhoMaximo": 10

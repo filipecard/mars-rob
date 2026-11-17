@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { CellDTO, GridDTO } from '../../../src/application/dto.js';
+import type { CellDTO, MapDTO } from '../../../src/application/dto.js';
 import {
   formatExploration,
   formatMap,
@@ -11,12 +11,12 @@ const around: CellDTO[] = [-1, 0, 1].flatMap((x) =>
   [-1, 0, 1].map((y) => ({ x, y, blocked: x === 1 && y === 1 })),
 );
 
-const base: GridDTO = {
+const base: MapDTO = {
   min: -2,
   max: 2,
-  obstacleCount: 3,
   explored: around,
-  robot: { x: 0, y: 0, orientation: 'N' },
+  robot: { id: 1, x: 0, y: 0, orientation: 'N' },
+  others: [],
 };
 
 describe('formatMap', () => {
@@ -44,11 +44,23 @@ describe('formatMap', () => {
   ] as const)(
     'o robô olhando para %s aparece como %s',
     (orientation, symbol) => {
-      const map = formatMap({ ...base, robot: { x: -2, y: 2, orientation } });
+      const map = formatMap({
+        ...base,
+        robot: { id: 1, x: -2, y: 2, orientation },
+      });
 
       expect(map.split('\n')[0]).toBe(`${symbol} ? ? ? ?`);
     },
   );
+
+  it('os outros robôs aparecem pelo ID', () => {
+    const map = formatMap({
+      ...base,
+      others: [{ id: 3, x: -1, y: 0, orientation: 'S' }],
+    });
+
+    expect(map.split('\n')[2]).toBe('? 3 ^ . ?');
+  });
 });
 
 describe('formatExploration', () => {
@@ -58,13 +70,17 @@ describe('formatExploration', () => {
 });
 
 describe('formatMapView', () => {
-  it('junta mapa, exploração e legenda', () => {
-    const lines = formatMapView(base).split('\n');
+  it('junta título, mapa, exploração e legenda', () => {
+    const lines = formatMapView({
+      ...base,
+      robot: { ...base.robot, id: 2 },
+    }).split('\n');
 
-    expect(lines).toHaveLength(7);
-    expect(lines[5]).toBe('Explorado: 9 de 25 casas');
-    expect(lines[6]).toBe(
-      'Legenda: ^ > v < robô (para onde olha)   # obstáculo   . livre   ? desconhecido',
+    expect(lines).toHaveLength(8);
+    expect(lines[0]).toBe('Mapa do robô 2');
+    expect(lines[6]).toBe('Explorado: 9 de 25 casas');
+    expect(lines[7]).toBe(
+      'Legenda: ^ > v < robô 2 (para onde olha)   número outro robô   # obstáculo   . livre   ? desconhecido',
     );
   });
 });

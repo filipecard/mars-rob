@@ -1,10 +1,13 @@
 import { readFile } from 'node:fs/promises';
+import { maxRobots } from '../../domain/entities/Fleet.js';
 import { MAX_SEED } from '../random/seededRandom.js';
 
 export const DEFAULT_CONFIG_PATH = 'mars-rob.config.json';
 
 export interface AppConfig {
   limit: number;
+  // RN13: quantos robôs, de 1 a maxRobots(limit)
+  robots: number;
   obstacles: { count: number; maxSize: number };
   // null: sorteia uma semente nova a cada execução
   seed: number | null;
@@ -12,6 +15,7 @@ export interface AppConfig {
 
 export const DEFAULT_CONFIG: AppConfig = {
   limit: 15,
+  robots: 1,
   obstacles: { count: 4, maxSize: 4 },
   seed: null,
 };
@@ -20,7 +24,7 @@ export type ConfigResult =
   { ok: true; config: AppConfig } | { ok: false; message: string };
 
 // Formato do arquivo (todas as chaves são opcionais; o que faltar usa o padrão):
-// { "limite": 15, "obstaculos": { "quantidade": 4, "tamanhoMaximo": 4 }, "semente": null }
+// { "limite": 15, "robos": 1, "obstaculos": { "quantidade": 4, "tamanhoMaximo": 4 }, "semente": null }
 export function parseConfig(raw: unknown): ConfigResult {
   if (!isObject(raw)) {
     return fail('a configuração deve ser um objeto JSON');
@@ -33,6 +37,17 @@ export function parseConfig(raw: unknown): ConfigResult {
   const limit = readInteger(raw['limite'], DEFAULT_CONFIG.limit, 1);
   if (limit === undefined) {
     return fail('"limite" deve ser um inteiro maior que 0');
+  }
+  const robots = readInteger(
+    raw['robos'],
+    DEFAULT_CONFIG.robots,
+    1,
+    maxRobots(limit),
+  );
+  if (robots === undefined) {
+    return fail(
+      `"robos" deve ser um inteiro de 1 a ${String(maxRobots(limit))} (1 robô a cada 3 de limite; o limite é ${String(limit)})`,
+    );
   }
   const count = readInteger(
     obstacles['quantidade'],
@@ -60,7 +75,10 @@ export function parseConfig(raw: unknown): ConfigResult {
     );
   }
 
-  return { ok: true, config: { limit, obstacles: { count, maxSize }, seed } };
+  return {
+    ok: true,
+    config: { limit, robots, obstacles: { count, maxSize }, seed },
+  };
 }
 
 // Lê o arquivo. Se o caminho não foi informado e o arquivo padrão não existe, usa o padrão.

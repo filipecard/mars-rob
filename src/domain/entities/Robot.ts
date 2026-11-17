@@ -1,3 +1,4 @@
+import { CollisionError } from '../errors/CollisionError.js';
 import { ObstacleError } from '../errors/ObstacleError.js';
 import { OutOfGridError } from '../errors/OutOfGridError.js';
 import type { Command } from '../value-objects/Command.js';
@@ -14,6 +15,9 @@ import { Position } from '../value-objects/Position.js';
 
 // RN12: o robô enxerga a casa onde está e 1 casa em todas as direções (inclusive diagonais)
 export const VISION_RANGE = 1;
+
+// RN15: o ID do robô que ocupa a posição, ou undefined se ela está vazia
+export type OccupantLookup = (position: Position) => number | undefined;
 
 export class Robot {
   readonly grid: Grid;
@@ -65,10 +69,32 @@ export class Robot {
     return this.#explored.has(keyOf(position));
   }
 
+  // RN16: soma ao mapa as casas recebidas de outro robô; devolve quantas eram novas
+  receiveMap(cells: readonly Position[]): number {
+    let added = 0;
+    for (const cell of cells) {
+      if (this.grid.contains(cell) && !this.hasExplored(cell)) {
+        this.#explored.set(keyOf(cell), cell);
+        added++;
+      }
+    }
+    return added;
+  }
+
+  // RN16: vizinho pelos lados (sem diagonal)
+  isNextTo(other: Robot): boolean {
+    const dx = Math.abs(this.position.x - other.position.x);
+    const dy = Math.abs(this.position.y - other.position.y);
+    return dx + dy === 1;
+  }
+
   // Executa as instruções na ordem: cada passo usa a orientação deixada pelos giros anteriores.
-  // RN04/RN09: valida limite e obstáculo a cada passo.
+  // RN04/RN09/RN15: valida limite, obstáculo e outros robôs a cada passo.
   // RN05: só atualiza posição, orientação e exploração se todos os passos forem válidos.
-  execute(command: Command): void {
+  execute(
+    command: Command,
+    occupantAt: OccupantLookup = () => undefined,
+  ): void {
     let position = this.#position;
     let orientation = this.#orientation;
     const path: Position[] = [];
@@ -83,6 +109,10 @@ export class Robot {
       }
       if (this.grid.isBlocked(position)) {
         throw new ObstacleError(position);
+      }
+      const occupant = occupantAt(position);
+      if (occupant !== undefined) {
+        throw new CollisionError(position, occupant);
       }
       path.push(position);
     }

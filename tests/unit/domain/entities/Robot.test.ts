@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Robot } from '../../../../src/domain/entities/Robot.js';
+import { CollisionError } from '../../../../src/domain/errors/CollisionError.js';
 import { ObstacleError } from '../../../../src/domain/errors/ObstacleError.js';
 import { OutOfGridError } from '../../../../src/domain/errors/OutOfGridError.js';
 import { Command } from '../../../../src/domain/value-objects/Command.js';
@@ -230,6 +231,58 @@ describe('Robot', () => {
       const robot = Robot.create(withObstacle);
 
       expect(robot.hasExplored(Position.create(1, 1))).toBe(true);
+    });
+  });
+
+  describe('outros robôs — RN15', () => {
+    const occupiedBy2 = (position: Position): number | undefined =>
+      position.equals(Position.create(0, 2)) ? 2 : undefined;
+
+    it('rejeita o comando que passa por outro robô e mantém o estado', () => {
+      const robot = Robot.create(grid);
+
+      expect(() => {
+        robot.execute(Command.parse('DNENNN'), occupiedBy2);
+      }).not.toThrow();
+      const blocked = Robot.create(grid);
+      expect(() => {
+        blocked.execute(Command.parse('NNN'), occupiedBy2);
+      }).toThrow(CollisionError);
+      expect(blocked.position.equals(Position.origin())).toBe(true);
+    });
+  });
+
+  describe('compartilhar mapa — RN16', () => {
+    it('soma só as casas novas e conta quantas eram', () => {
+      const robot = Robot.create(grid);
+
+      const added = robot.receiveMap([
+        Position.create(0, 0),
+        Position.create(5, 5),
+        Position.create(5, 6),
+        Position.create(5, 6),
+      ]);
+
+      expect(added).toBe(2);
+      expect(robot.hasExplored(Position.create(5, 6))).toBe(true);
+    });
+
+    it('ignora casas fora da malha', () => {
+      expect(Robot.create(grid).receiveMap([Position.create(16, 0)])).toBe(0);
+    });
+
+    it.each<[number, number, boolean]>([
+      [0, 1, true],
+      [1, 0, true],
+      [0, -1, true],
+      [-1, 0, true],
+      [1, 1, false],
+      [0, 2, false],
+    ])('(0,0) e (%i,%i) lado a lado: %s', (x, y, expected) => {
+      const robot = Robot.create(grid);
+      const other = Robot.create(grid, Position.create(x, y));
+
+      expect(robot.isNextTo(other)).toBe(expected);
     });
   });
 });
