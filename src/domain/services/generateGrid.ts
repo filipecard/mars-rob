@@ -3,7 +3,6 @@ import { keyOf, Obstacle, sideNeighbors } from '../value-objects/Obstacle.js';
 import { Position } from '../value-objects/Position.js';
 import type { Random } from './random.js';
 
-
 export interface ObstacleSettings {
   count: number;
   maxSize: number;

@@ -6,22 +6,17 @@ const fleet: FleetDTO = {
   min: -2,
   max: 2,
   obstacleCount: 1,
-  robots: [
-    { id: 1, x: 0, y: 0, orientation: 'N' },
-    { id: 2, x: -2, y: 2, orientation: 'N' },
-  ],
+  robotCount: 2,
 };
 
 describe('formatWelcome', () => {
-  it('mostra a malha, a semente, os robôs e as ordens', () => {
+  it('mostra a malha, a semente, quantos robôs há (sem dizer onde) e as ordens', () => {
     expect(formatWelcome(fleet, 42).split('\n')).toEqual([
       'Malha de -2 a 2 nos dois eixos, 1 obstáculo, 2 robôs (semente 42).',
-      'Robô 1: posição atual (X: 0, Y: 0) para o Norte',
-      'Robô 2: posição atual (X: -2, Y: 2) para o Norte',
       'Ordens (várias na mesma linha, separadas por espaço):',
       '  ID:COMANDOS  move um robô (passos N, S, L, O; giros D, E), ex.: 1:NNDE',
       '  DE>PARA      envia o mapa de um robô para outro que está ao lado, ex.: 1>2',
-      '"mapa ID" mostra o mapa de um robô, "robos" lista os robôs e "sair" encerra.',
+      '"mapa ID" mostra o mapa de um robô e "sair" encerra.',
     ]);
   });
 
@@ -34,7 +29,7 @@ describe('formatWelcome', () => {
       const dto = {
         ...fleet,
         obstacleCount,
-        robots: fleet.robots.slice(0, robots),
+        robotCount: robots,
       };
 
       expect(formatWelcome(dto, 1).split('\n')[0]).toContain(text);

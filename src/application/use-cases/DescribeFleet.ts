@@ -1,7 +1,7 @@
 import { toFleetDTO, type FleetDTO } from '../dto.js';
 import type { FleetRepository } from '../ports/FleetRepository.js';
 
-// Resumo da malha e a posição de cada robô
+// Resumo da malha: limites, quantos obstáculos e quantos robôs
 export class DescribeFleet {
   readonly #fleets: FleetRepository;
 

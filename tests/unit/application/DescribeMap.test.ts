@@ -19,19 +19,17 @@ const sortCells = <T extends { x: number; y: number }>(cells: T[]): T[] =>
   [...cells].sort((a, b) => a.x - b.x || a.y - b.y);
 
 describe('DescribeFleet', () => {
-  it('CA49 — devolve limites, obstáculos e todos os robôs — RN13', async () => {
+  it('devolve limites e quantidades, sem dizer onde os robôs estão — RN13', async () => {
     const grid = Grid.square(3, [Obstacle.create([at(2, 1)])]);
-    const repository = new InMemoryFleetRepository(Fleet.place(grid, starts(3)));
+    const repository = new InMemoryFleetRepository(
+      Fleet.place(grid, starts(3)),
+    );
 
     expect(await new DescribeFleet(repository).execute()).toEqual({
       min: -3,
       max: 3,
       obstacleCount: 1,
-      robots: [
-        { id: 1, x: 0, y: 0, orientation: 'N' },
-        { id: 2, x: -3, y: 3, orientation: 'N' },
-        { id: 3, x: 3, y: 3, orientation: 'N' },
-      ],
+      robotCount: 3,
     });
   });
 });
@@ -43,7 +41,9 @@ describe('DescribeMap', () => {
   ]);
 
   it('expõe só as casas que o robô explorou, marcando os obstáculos — RN12', async () => {
-    const repository = new InMemoryFleetRepository(Fleet.create(grid, 1, Math.random));
+    const repository = new InMemoryFleetRepository(
+      Fleet.create(grid, 1, Math.random),
+    );
     await new ExecuteOrders(repository).execute('1:L');
 
     const result = await new DescribeMap(repository).execute(1);
@@ -73,7 +73,7 @@ describe('DescribeMap', () => {
     expect(result.ok && result.map.explored).toHaveLength(4);
   });
 
-  it('CA59 — outros robôs aparecem só em casas que este robô conhece', async () => {
+  it('CA59 — outros robôs aparecem só dentro da visão atual', async () => {
     const repository = new InMemoryFleetRepository(
       Fleet.place(Grid.square(3), [
         { position: at(0, 0) },
@@ -87,6 +87,24 @@ describe('DescribeMap', () => {
     expect(result.ok && result.map.others).toEqual([
       { id: 2, x: 1, y: 1, orientation: 'N' },
     ]);
+  });
+
+  it('CA65 — um robô visto antes some do mapa quando sai da visão', async () => {
+    const repository = new InMemoryFleetRepository(
+      Fleet.place(Grid.square(3), [
+        { position: at(0, 0) },
+        { position: at(1, -1) },
+      ]),
+    );
+    await new ExecuteOrders(repository).execute('1:NN');
+
+    const result = await new DescribeMap(repository).execute(1);
+
+    // (1,-1) continua no mapa do robô 1, mas ele não vê mais o robô 2 lá
+    expect(
+      result.ok && result.map.explored.some((c) => c.x === 1 && c.y === -1),
+    ).toBe(true);
+    expect(result.ok && result.map.others).toEqual([]);
   });
 
   it('robô inexistente', async () => {

@@ -1,5 +1,4 @@
 import type {
-  FleetDTO,
   OrientationDTO,
   PositionDTO,
   RobotStateDTO,
@@ -21,11 +20,6 @@ const robotName = (id: number): string => `Robô ${String(id)}`;
 
 export function formatRobotState(robot: RobotStateDTO): string {
   return `${robotName(robot.id)}: posição atual ${formatPosition(robot)} para o ${ORIENTATION_NAMES[robot.orientation]}`;
-}
-
-// Uma linha por robô
-export function formatFleet({ robots }: FleetDTO): string {
-  return robots.map(formatRobotState).join('\n');
 }
 
 function formatNewCells(count: number): string {

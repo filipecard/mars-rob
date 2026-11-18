@@ -69,6 +69,14 @@ export class Robot {
     return this.#explored.has(keyOf(position));
   }
 
+  // RN12: a casa está dentro da visão atual (3x3 em volta do robô)
+  canSee(position: Position): boolean {
+    return (
+      Math.abs(position.x - this.position.x) <= VISION_RANGE &&
+      Math.abs(position.y - this.position.y) <= VISION_RANGE
+    );
+  }
+
   // RN16: soma ao mapa as casas recebidas de outro robô; devolve quantas eram novas
   receiveMap(cells: readonly Position[]): number {
     let added = 0;

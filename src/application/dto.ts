@@ -21,16 +21,17 @@ export interface CellDTO extends PositionDTO {
   blocked: boolean;
 }
 
-// Resumo da malha e de onde está cada robô
+// Resumo da malha. RN13: diz quantos robôs há, mas não onde estão.
 export interface FleetDTO {
   min: number;
   max: number;
   obstacleCount: number;
-  robots: RobotStateDTO[];
+  robotCount: number;
 }
 
 // RN12: o mapa de um robô mostra só o que ele já viu (ou recebeu de outro robô, RN16).
-// `others`: os outros robôs que estão em casas que este robô conhece.
+// `others`: só os outros robôs que este robô está vendo agora (visão 3x3). Um robô
+// não sabe onde o outro está até encontrá-lo.
 export interface MapDTO {
   min: number;
   max: number;
@@ -57,7 +58,7 @@ export function toFleetDTO(fleet: Fleet): FleetDTO {
     min: grid.min,
     max: grid.max,
     obstacleCount: grid.obstacles.length,
-    robots: fleet.ids.map((id) => toRobotStateDTO(id, fleet.robot(id))),
+    robotCount: fleet.ids.length,
   };
 }
 
@@ -74,8 +75,7 @@ export function toMapDTO(fleet: Fleet, id: number): MapDTO {
     robot: toRobotStateDTO(id, robot),
     others: fleet.ids
       .filter(
-        (other) =>
-          other !== id && robot.hasExplored(fleet.robot(other).position),
+        (other) => other !== id && robot.canSee(fleet.robot(other).position),
       )
       .map((other) => toRobotStateDTO(other, fleet.robot(other))),
   };

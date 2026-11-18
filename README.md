@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/filipecard/mars-rob/actions/workflows/ci.yml/badge.svg)](https://github.com/filipecard/mars-rob/actions/workflows/ci.yml)
 
-Até 5 robôs controlados por comandos de texto numa malha quadrada, com obstáculos sorteados
+Robôs controlados por comandos de texto numa malha quadrada, com obstáculos sorteados
 e mapa escuro: cada robô só conhece o que já viu, e os robôs podem trocar mapas entre si.
 É um projeto de estudo de **TypeScript**, **Clean Architecture** e **TDD**.
 
@@ -31,7 +31,7 @@ Tudo fica em `mars-rob.config.json` (para usar outro arquivo: `npm run dev -- --
 | Chave                      | O que faz                                                            | Padrão |
 | -------------------------- | -------------------------------------------------------------------- | ------ |
 | `limite`                   | a malha vai de `-limite` a `limite` nos dois eixos                   | `15`   |
-| `robos`                    | quantos robôs (de 1 a 5)                                             | `1`    |
+| `robos`                    | quantos robôs: de 1 até limite ÷ 3 (limite 15: 5; 18: 6; 21: 7)      | `1`    |
 | `obstaculos.quantidade`    | quantos obstáculos sortear                                           | `4`    |
 | `obstaculos.tamanhoMaximo` | cada obstáculo tem de 1 até este número de casas                     | `4`    |
 | `semente`                  | `null` sorteia um mapa novo a cada execução; um número repete o mapa | `null` |
@@ -43,8 +43,9 @@ A semente usada aparece na tela; coloque-a em `"semente"` para repetir o mesmo m
 
 ## Comandos
 
-Os robôs têm IDs 1, 2, 3... e nascem, nessa ordem, na origem (0,0) e nos cantos: superior
-esquerdo, superior direito, inferior esquerdo e inferior direito. Todos começam olhando para o Norte.
+Os robôs têm IDs 1, 2, 3... O robô 1 nasce na origem (0,0); os outros nascem em casas livres
+sorteadas (com a mesma semente do mapa), sem encostar em outro robô. Todos começam olhando para o Norte.
+A tela inicial só diz quantos robôs há; para saber onde um robô está, use `mapa ID` ou a ordem vazia `ID:`.
 
 Cada linha digitada tem uma ou mais **ordens**, separadas por espaço, executadas da esquerda para a direita:
 
@@ -74,14 +75,13 @@ Comandos do sistema:
 | Comando   | Efeito                     |
 | --------- | -------------------------- |
 | `mapa ID` | mostra o mapa do robô `ID` |
-| `robos`   | mostra onde está cada robô |
 | `sair`    | encerra o programa         |
 
 O mapa começa **escuro** e **cada robô tem o seu**: ele só enxerga a casa onde está e 1 casa em volta
 (inclusive diagonais), e o mapa dele revela apenas o que ele já viu pelo caminho. Quando dois robôs estão
 lado a lado (vizinhos pelos lados, sem diagonal), um pode enviar o mapa para o outro com `DE>PARA`; para
 trocar nos dois sentidos, use `1>2 2>1`. No mapa, `^ > v <` é o dono do mapa (para onde ele olha), um número
-é outro robô (só aparece se estiver numa casa conhecida), `#` é obstáculo, `.` é casa livre e `?` é desconhecido.
+é outro robô (só aparece enquanto estiver na visão; nenhum robô sabe onde o outro está até encontrá-lo), `#` é obstáculo, `.` é casa livre e `?` é desconhecido.
 
 O comando é atômico: se algum passo sair da malha, bater num obstáculo ou passar por outro robô, o comando
 inteiro é rejeitado e o robô fica onde estava.

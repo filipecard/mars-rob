@@ -139,7 +139,11 @@ describe('ExecuteOrders — obstáculos e malha configurável', () => {
 
   beforeEach(() => {
     orders = executeOn(
-      Fleet.create(Grid.square(15, [Obstacle.create([at(0, 2)])]), 1, Math.random),
+      Fleet.create(
+        Grid.square(15, [Obstacle.create([at(0, 2)])]),
+        1,
+        Math.random,
+      ),
     );
   });
 

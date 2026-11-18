@@ -2,11 +2,10 @@ import type { DescribeFleet } from '../../application/use-cases/DescribeFleet.js
 import type { DescribeMap } from '../../application/use-cases/DescribeMap.js';
 import type { ExecuteOrders } from '../../application/use-cases/ExecuteOrders.js';
 import { formatMapView } from './formatMap.js';
-import { formatFleet, formatOrderResult } from './formatResult.js';
+import { formatOrderResult } from './formatResult.js';
 
 export const EXIT_COMMAND = 'sair';
 export const MAP_COMMAND = 'mapa';
-export const ROBOTS_COMMAND = 'robos';
 
 export const MAP_USAGE = `Use "${MAP_COMMAND} ID" para ver o mapa de um robô, ex.: ${MAP_COMMAND} 1`;
 
@@ -36,12 +35,9 @@ export async function runCli(
 }
 
 async function respond(
-  { executeOrders, describeFleet, describeMap }: CliUseCases,
+  { executeOrders, describeMap }: CliUseCases,
   line: string,
 ): Promise<string> {
-  if (line === ROBOTS_COMMAND) {
-    return formatFleet(await describeFleet.execute());
-  }
   const map = MAP_PATTERN.exec(line);
   if (map !== null) {
     const id = map[1]?.trim() ?? '';

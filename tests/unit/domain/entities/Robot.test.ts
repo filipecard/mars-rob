@@ -252,6 +252,15 @@ describe('Robot', () => {
     });
   });
 
+  it.each<[number, number, boolean]>([
+    [1, 1, true],
+    [-1, 0, true],
+    [2, 0, false],
+    [0, -2, false],
+  ])('vê (%i,%i) estando na origem: %s — RN12', (x, y, expected) => {
+    expect(Robot.create(grid).canSee(Position.create(x, y))).toBe(expected);
+  });
+
   describe('compartilhar mapa — RN16', () => {
     it('soma só as casas novas e conta quantas eram', () => {
       const robot = Robot.create(grid);

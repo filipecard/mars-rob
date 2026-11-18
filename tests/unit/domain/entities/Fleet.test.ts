@@ -1,57 +1,111 @@
 import { describe, expect, it } from 'vitest';
 import {
   Fleet,
-  MAX_ROBOTS,
+  maxRobots,
   startingPositions,
+  type Placement,
 } from '../../../../src/domain/entities/Fleet.js';
 import { CollisionError } from '../../../../src/domain/errors/CollisionError.js';
 import { NotAdjacentError } from '../../../../src/domain/errors/NotAdjacentError.js';
 import { ObstacleError } from '../../../../src/domain/errors/ObstacleError.js';
 import { UnknownRobotError } from '../../../../src/domain/errors/UnknownRobotError.js';
+import { generateGrid } from '../../../../src/domain/services/generateGrid.js';
 import { Command } from '../../../../src/domain/value-objects/Command.js';
 import { Grid } from '../../../../src/domain/value-objects/Grid.js';
 import { Obstacle } from '../../../../src/domain/value-objects/Obstacle.js';
 import { Position } from '../../../../src/domain/value-objects/Position.js';
+import { seededRandom } from '../../../../src/infrastructure/random/seededRandom.js';
 
 const at = (x: number, y: number): Position => Position.create(x, y);
 const coords = ({ x, y }: Position): [number, number] => [x, y];
+
+// Robô 1 na origem e robô 2 no canto (-3,3)
+const pair: Placement[] = [{ position: at(0, 0) }, { position: at(-3, 3) }];
+
+describe('maxRobots — RN13', () => {
+  it.each([
+    [1, 1],
+    [2, 1],
+    [3, 1],
+    [5, 1],
+    [6, 2],
+    [15, 5],
+    [17, 5],
+    [18, 6],
+    [21, 7],
+  ])('malha de limite %i: no máximo %i robôs', (limit, expected) => {
+    expect(maxRobots(limit)).toBe(expected);
+  });
+});
+
+describe('startingPositions — RN13', () => {
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])(
+    'semente %i: robô 1 na origem e os outros em casas livres, sem encostar em ninguém',
+    (seed) => {
+      const random = seededRandom(seed);
+      const grid = generateGrid(21, { count: 8, maxSize: 6 }, random);
+
+      const positions = startingPositions(grid, maxRobots(21), random);
+
+      expect(positions).toHaveLength(7);
+      expect(coords(positions[0] as Position)).toEqual([0, 0]);
+      for (const [i, a] of positions.entries()) {
+        expect(grid.contains(a) && !grid.isBlocked(a)).toBe(true);
+        for (const b of positions.slice(i + 1)) {
+          const far = Math.abs(a.x - b.x) > 1 || Math.abs(a.y - b.y) > 1;
+          expect(far).toBe(true);
+        }
+      }
+    },
+  );
+
+  it('a mesma semente gera as mesmas posições', () => {
+    const grid = Grid.square(15);
+    const first = startingPositions(grid, 5, seededRandom(7)).map(coords);
+    const second = startingPositions(grid, 5, seededRandom(7)).map(coords);
+
+    expect(first).toEqual(second);
+  });
+
+  it('falha quando não há espaço para os robôs', () => {
+    expect(() => startingPositions(Grid.square(1), 2, seededRandom(1))).toThrow(
+      RangeError,
+    );
+  });
+});
 
 describe('Fleet', () => {
   const grid = Grid.square(3);
 
   describe('criação — RN13', () => {
-    it('nasce na origem e depois nos cantos: sup. esq., sup. dir., inf. esq., inf. dir.', () => {
-      expect(startingPositions(grid).map(coords)).toEqual([
-        [0, 0],
-        [-3, 3],
-        [3, 3],
-        [-3, -3],
-        [3, -3],
-      ]);
-    });
-
     it('cria os robôs com IDs de 1 a N, olhando para o Norte', () => {
-      const fleet = Fleet.create(grid, 3);
+      const fleet = Fleet.create(Grid.square(15), 5, seededRandom(3));
 
-      expect(fleet.ids).toEqual([1, 2, 3]);
-      expect(fleet.ids.map((id) => coords(fleet.robot(id).position))).toEqual([
-        [0, 0],
-        [-3, 3],
-        [3, 3],
-      ]);
+      expect(fleet.ids).toEqual([1, 2, 3, 4, 5]);
+      expect(coords(fleet.robot(1).position)).toEqual([0, 0]);
       expect(fleet.ids.map((id) => fleet.robot(id).orientation)).toEqual([
         'N',
         'N',
         'N',
+        'N',
+        'N',
       ]);
     });
 
-    it(`aceita até ${String(MAX_ROBOTS)} robôs`, () => {
-      expect(Fleet.create(grid, MAX_ROBOTS).ids).toHaveLength(MAX_ROBOTS);
+    it.each([
+      [15, 6],
+      [18, 7],
+      [3, 2],
+    ])('na malha de limite %i rejeita %i robôs', (limit, count) => {
+      expect(() =>
+        Fleet.create(Grid.square(limit), count, seededRandom(1)),
+      ).toThrow(RangeError);
     });
 
-    it.each([0, MAX_ROBOTS + 1, 1.5])('rejeita %s robôs', (count) => {
-      expect(() => Fleet.create(grid, count)).toThrow(RangeError);
+    it.each([0, 1.5])('rejeita %s robôs', (count) => {
+      expect(() => Fleet.create(grid, count, seededRandom(1))).toThrow(
+        RangeError,
+      );
     });
 
     it('não aceita dois robôs na mesma posição', () => {
@@ -73,7 +127,7 @@ describe('Fleet', () => {
     });
 
     it('cada robô começa com o próprio mapa — RN12', () => {
-      const fleet = Fleet.create(grid, 2);
+      const fleet = Fleet.place(grid, pair);
 
       expect(fleet.robot(1).hasExplored(at(0, 0))).toBe(true);
       expect(fleet.robot(1).hasExplored(at(-3, 3))).toBe(false);
@@ -83,14 +137,14 @@ describe('Fleet', () => {
   });
 
   it('robô inexistente — RN14', () => {
-    const fleet = Fleet.create(grid, 2);
+    const fleet = Fleet.place(grid, pair);
 
     expect(() => fleet.robot(3)).toThrow(UnknownRobotError);
     expect(() => fleet.move(9, Command.parse('N'))).toThrow(UnknownRobotError);
   });
 
   it('move só o robô indicado', () => {
-    const fleet = Fleet.create(grid, 2);
+    const fleet = Fleet.place(grid, pair);
 
     fleet.move(2, Command.parse('DN'));
 
@@ -176,7 +230,7 @@ describe('Fleet', () => {
     });
 
     it('rejeita robô inexistente', () => {
-      const fleet = Fleet.create(grid, 1);
+      const fleet = Fleet.create(grid, 1, seededRandom(1));
 
       expect(() => fleet.shareMap(1, 2)).toThrow(UnknownRobotError);
     });

@@ -59,7 +59,9 @@ describe('runCli', () => {
   });
 
   it('imprime uma linha por ordem', async () => {
-    expect(await run(['1:N 2:DN'], Fleet.place(Grid.square(3), starts(2)))).toEqual([
+    expect(
+      await run(['1:N 2:DN'], Fleet.place(Grid.square(3), starts(2))),
+    ).toEqual([
       [
         'Robô 1: posição atual (X: 0, Y: 1) para o Norte',
         'Robô 2: posição atual (X: -2, Y: 3) para o Leste',
@@ -81,7 +83,10 @@ describe('runCli', () => {
 
   it('imprime onde está o obstáculo', async () => {
     const fleet = Fleet.create(
-      Grid.square(15, [Obstacle.create([at(-1, 3)])]), 1, Math.random);
+      Grid.square(15, [Obstacle.create([at(-1, 3)])]),
+      1,
+      Math.random,
+    );
 
     expect(await run(['1:NNNO'], fleet)).toEqual([
       'Robô 1: não pode passar pelo obstáculo em (X: -1, Y: 3)',
@@ -126,18 +131,12 @@ describe('runCli', () => {
     ]);
   });
 
-  it('"robos" lista todos os robôs', async () => {
-    expect(await run(['robos'], Fleet.place(Grid.square(3), starts(2)))).toEqual([
-      [
-        'Robô 1: posição atual (X: 0, Y: 0) para o Norte',
-        'Robô 2: posição atual (X: -3, Y: 3) para o Norte',
-      ].join('\n'),
-    ]);
-  });
-
   it('"mapa 1" mostra o mapa do robô 1 com a legenda', async () => {
     const fleet = Fleet.create(
-      Grid.square(1, [Obstacle.create([at(0, 1)])]), 1, Math.random);
+      Grid.square(1, [Obstacle.create([at(0, 1)])]),
+      1,
+      Math.random,
+    );
 
     expect(await run(['1:D', 'mapa 1'], fleet)).toEqual([
       'Robô 1: posição atual (X: 0, Y: 0) para o Leste',

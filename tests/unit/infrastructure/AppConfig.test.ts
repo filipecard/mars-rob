@@ -17,7 +17,7 @@ describe('parseConfig', () => {
     expect(
       parseConfig({
         limite: 10,
-        robos: 4,
+        robos: 3,
         obstaculos: { quantidade: 6, tamanhoMaximo: 3 },
         semente: 42,
       }),
@@ -25,10 +25,20 @@ describe('parseConfig', () => {
       ok: true,
       config: {
         limit: 10,
-        robots: 4,
+        robots: 3,
         obstacles: { count: 6, maxSize: 3 },
         seed: 42,
       },
+    });
+  });
+
+  it.each([
+    [18, 6],
+    [21, 7],
+  ])('com limite %i aceita até %i robôs — RN13', (limite, robos) => {
+    expect(parseConfig({ limite, robos })).toMatchObject({
+      ok: true,
+      config: { limit: limite, robots: robos },
     });
   });
 
@@ -56,6 +66,10 @@ describe('parseConfig', () => {
     [{ limite: 2.5 }, '"limite"'],
     [{ robos: 0 }, '"robos" deve ser um inteiro de 1 a 5'],
     [{ robos: 6 }, '"robos"'],
+    [
+      { limite: 17, robos: 6 },
+      'de 1 a 5 (1 robô a cada 3 de limite; o limite é 17)',
+    ],
     [{ robos: '2' }, '"robos"'],
     [{ obstaculos: 4 }, '"obstaculos" deve ser um objeto'],
     [{ obstaculos: { quantidade: -1 } }, '"obstaculos.quantidade"'],

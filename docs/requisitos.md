@@ -2,7 +2,7 @@
 
 ## 1. Visão geral
 
-Sistema de linha de comando que controla de 1 a 5 robôs numa malha quadrada. O operador
+Sistema de linha de comando que controla um ou mais robôs numa malha quadrada. O operador
 digita ordens de texto (qual robô executa qual sequência de passos e giros, ou qual robô
 envia o mapa para outro) e o sistema responde, para cada ordem, com a nova posição e
 orientação do robô, com o resultado do compartilhamento ou com o motivo da rejeição.
@@ -36,8 +36,8 @@ orientação do robô, com o resultado do compartilhamento ou com o motivo da re
 - **RN09** — Obstáculos: o robô não pode parar num obstáculo nem atravessá-lo. Assim como o limite (RN04), isso é validado a cada passo, e o comando inteiro é rejeitado (RN05).
 - **RN10** — Geração dos obstáculos: ao iniciar, o programa sorteia exatamente `quantidade` obstáculos. O tamanho de cada um é sorteado de 1 a `tamanhoMaximo` posições, e o formato é sorteado também: o obstáculo cresce a partir de uma posição para vizinhos (pelos lados) escolhidos ao acaso, o que gera retas, L, T, Z, quadrados etc. Obstáculos não se sobrepõem nem se encostam (nem na diagonal).
 - **RN11** — Acesso garantido: os obstáculos nunca podem impedir o robô de chegar a qualquer posição livre. A origem e os 4 cantos ficam sempre livres, e toda posição livre é alcançável a partir de qualquer outra. Assim o robô sempre consegue chegar aos 4 lados (cima, baixo, esquerda e direita) e aos 4 cantos. Se a configuração não couber na malha sem bloquear o caminho, o programa mostra o erro e encerra com código 1.
-- **RN12** — Mapa escuro: cada robô tem o próprio mapa, que começa desconhecido e mostra só o que aquele robô já viu (ou recebeu de outro robô, RN16). Ao ser criado, ele vê a vizinhança 3x3 da posição inicial. Em cada passo de um comando aceito, ele vê a vizinhança 3x3 da casa onde está, então todo o caminho é revelado, e não só o destino. Giros não revelam nada. Comando rejeitado não revela nada, porque o robô não saiu do lugar (RN05). Casas fora da malha não contam. Obstáculos dentro da visão aparecem no mapa, mesmo sem o robô bater neles. A exploração se acumula entre comandos. No mapa de um robô, os outros robôs aparecem só se estiverem em casas que ele conhece.
-- **RN13** — Frota: a quantidade de robôs (1 a 5) vem da configuração. Os IDs são 1, 2, 3... e eles nascem, nessa ordem, na origem, no canto superior esquerdo, no superior direito, no inferior esquerdo e no inferior direito. Essas posições são sempre livres (RN11).
+- **RN12** — Mapa escuro: cada robô tem o próprio mapa, que começa desconhecido e mostra só o que aquele robô já viu (ou recebeu de outro robô, RN16). Ao ser criado, ele vê a vizinhança 3x3 da posição inicial. Em cada passo de um comando aceito, ele vê a vizinhança 3x3 da casa onde está, então todo o caminho é revelado, e não só o destino. Giros não revelam nada. Comando rejeitado não revela nada, porque o robô não saiu do lugar (RN05). Casas fora da malha não contam. Obstáculos dentro da visão aparecem no mapa, mesmo sem o robô bater neles. A exploração se acumula entre comandos. Um robô não sabe onde os outros estão até encontrá-los: no mapa dele, outro robô só aparece enquanto estiver dentro da visão 3x3 atual (se sair da visão, a casa continua conhecida, mas o robô some dela).
+- **RN13** — Frota: a quantidade de robôs vem da configuração e vai de 1 até 1 robô a cada 3 de limite, arredondando para baixo (limite 15: até 5; 18: até 6; 21: até 7), e sempre pelo menos 1. Os IDs são 1, 2, 3... O robô 1 nasce na origem; os outros nascem em casas livres sorteadas com a mesma semente dos obstáculos (RN10), sem nascer encostados em outro robô (nem na diagonal). Toda casa livre é alcançável (RN11). A tela inicial informa quantos robôs há, mas não onde estão.
 - **RN14** — Ordens: cada linha tem zero ou mais ordens separadas por espaços. `ID:COMANDO` move o robô do ID; o ID é um inteiro sem zero à esquerda e o comando segue a RN07. As ordens rodam em sequência, da esquerda para a direita, e são independentes: uma ordem rejeitada (formato inválido, comando inválido, robô inexistente, limite, obstáculo, colisão) não desfaz as anteriores nem impede as seguintes. O mesmo robô pode receber várias ordens na mesma linha.
 - **RN15** — Colisão: um robô não pode parar na casa de outro robô nem atravessá-la. Como o limite e os obstáculos, isso é validado a cada passo, e o comando inteiro é rejeitado (RN05). Vale a posição dos outros robôs no momento da ordem.
 - **RN16** — Compartilhar mapa: `DE>PARA` faz o robô DE enviar o mapa dele para o robô PARA, que soma as casas que ainda não conhecia. Só o receptor muda; para trocar nos dois sentidos, use `1>2 2>1`. Os dois robôs precisam estar lado a lado. Um robô não envia o mapa para si mesmo (`1>1` é formato inválido).
@@ -50,7 +50,7 @@ orientação do robô, com o resultado do compartilhamento ou com o motivo da re
 - Quantidade de passos: sem limite, desde que o robô não saia da malha (RN04).
 - Letras aceitas: `N`, `S`, `L`, `O`, `D`, `E`, somente maiúsculas.
 - Ordem de compartilhamento: `DE>PARA`, ex.: `1>2`. Inválidas: `1>`, `1>1`, `1>2>3`.
-- Comandos do sistema (a linha inteira): `mapa ID` (ex.: `mapa 1`), `robos` e `sair`.
+- Comandos do sistema (a linha inteira): `mapa ID` (ex.: `mapa 1`) e `sair`.
 
 ### Configuração
 
@@ -66,13 +66,13 @@ Todas as chaves são opcionais; o que faltar usa o padrão. Sem o arquivo padrã
 }
 ```
 
-| Chave                      | Regra | Valores                     | Padrão |
-| -------------------------- | ----- | --------------------------- | ------ |
-| `limite`                   | RN02  | inteiro > 0                 | 15     |
-| `robos`                    | RN13  | inteiro de 1 a 5            | 1      |
-| `obstaculos.quantidade`    | RN10  | inteiro >= 0                | 4      |
-| `obstaculos.tamanhoMaximo` | RN10  | inteiro > 0                 | 4      |
-| `semente`                  | RN10  | `null` (sorteia) ou inteiro | `null` |
+| Chave                      | Regra | Valores                            | Padrão |
+| -------------------------- | ----- | ---------------------------------- | ------ |
+| `limite`                   | RN02  | inteiro > 0                        | 15     |
+| `robos`                    | RN13  | inteiro de 1 a limite ÷ 3 (mín. 1) | 1      |
+| `obstaculos.quantidade`    | RN10  | inteiro >= 0                       | 4      |
+| `obstaculos.tamanhoMaximo` | RN10  | inteiro > 0                        | 4      |
+| `semente`                  | RN10  | `null` (sorteia) ou inteiro        | `null` |
 
 Configuração inválida (chave com valor errado, JSON inválido, arquivo informado que não existe, obstáculos que não cabem): o programa mostra o erro e encerra com código 1.
 
@@ -89,10 +89,9 @@ Uma linha de resposta por ordem, na ordem em que foram digitadas. Linha sem orde
 - Obstáculo: `Robô 1: não pode passar pelo obstáculo em (X: 0, Y: 2)`
 - Colisão: `Robô 1: não pode passar pelo robô 2 em (X: 0, Y: 2)`
 - Robôs longe: `Os robôs 1 e 3 precisam estar lado a lado para compartilhar o mapa`
-- Ao iniciar: resumo (`Malha de -15 a 15 nos dois eixos, 4 obstáculos, 3 robôs (semente 123).`), a posição de cada robô e a ajuda das ordens.
-- `robos`: a posição de cada robô, uma linha por robô.
+- Ao iniciar: resumo (`Malha de -15 a 15 nos dois eixos, 4 obstáculos, 3 robôs (semente 123).`) e a ajuda das ordens. Não mostra onde os robôs estão.
 - `mapa ID`: título (`Mapa do robô 1`), o mapa daquele robô, quanto ele explorou (`Explorado: 15 de 961 casas`) e a legenda. Sem ID ou com ID mal escrito: `Use "mapa ID" para ver o mapa de um robô, ex.: mapa 1`.
-- Mapa: Norte para cima; `^ > v <` é o robô dono do mapa olhando para N, L, S, O; um número é outro robô (o ID dele); `#` é obstáculo; `.` é livre; `?` é desconhecido (RN12). Exemplo de malha com limite 2, logo no início, com um obstáculo visto em (1,1):
+- Mapa: Norte para cima; `^ > v <` é o robô dono do mapa olhando para N, L, S, O; um número é outro robô que ele está vendo agora (o ID dele); `#` é obstáculo; `.` é livre; `?` é desconhecido (RN12). Exemplo de malha com limite 2, logo no início, com um obstáculo visto em (1,1):
 
 ```
 ? ? ? ? ?
@@ -172,26 +171,27 @@ Mapa escuro (malha com limite 3, sem obstáculos, salvo indicação):
 | CA47 | RN12       | obstáculo em (1,1)      | início                     | o obstáculo aparece como `#` sem o robô bater nele        |
 | CA48 | RN12       | (0,0)                   | `"LL"` e depois `"mapa 1"` | `Explorado: 15 de 49 casas`                               |
 
-Vários robôs (malha com limite 3, sem obstáculos, 3 robôs: 1 em (0,0), 2 em (-3,3) e 3 em (3,3), salvo indicação). Aqui as linhas são digitadas como estão:
+Vários robôs (malha com limite 3, sem obstáculos, 3 robôs colocados direto nos testes: 1 em (0,0), 2 em (-3,3) e 3 em (3,3), salvo indicação). Aqui as linhas são digitadas como estão:
 
-| CA   | Regra      | Dado                                | Quando             | Então                                                            |
-| ---- | ---------- | ----------------------------------- | ------------------ | ---------------------------------------------------------------- |
-| CA49 | RN13       | início                              | `robos`            | 1 em (0,0), 2 em (-3,3), 3 em (3,3), todos olhando N             |
-| CA50 | RN14       | início                              | `1:N 2:DN`         | 1 em (0,1) olhando N; 2 em (-2,3) olhando L                      |
-| CA51 | RN14       | início                              | `2:DN 2:N`         | 2 em (-2,3) e depois em (-1,3)                                   |
-| CA52 | RN14       | início                              | `NN`, `0:N`, `1>1` | erro de formato                                                  |
-| CA53 | RN14       | início                              | `9:N`              | erro: robô 9 não existe                                          |
-| CA54 | RN14       | início                              | `1:N 2:X 3:EN`     | 1 em (0,1); erro de comando no 2; 3 em (2,3) olhando O           |
-| CA55 | RN15       | 1 em (0,0), 2 em (0,2)              | `1:NN`             | erro de colisão com o robô 2 em (0,2); 1 fica em (0,0)           |
-| CA56 | RN15       | 1 em (0,0), 2 em (0,2)              | `1:NNN`            | erro de colisão (não atravessa); 1 fica em (0,0)                 |
-| CA57 | RN14, RN15 | 1 em (0,0), 2 em (0,2)              | `2:L 1:NN`         | 2 em (1,2); depois 1 em (0,2), porque a casa já ficou livre      |
-| CA58 | RN12       | início, 2 robôs                     | `1:NN` e `mapa 2`  | o mapa do 2 não muda: `Explorado: 4 de 49 casas`                 |
-| CA59 | RN12       | 1 em (0,0), 2 em (1,1), 3 em (3,-3) | `mapa 1`           | o 2 aparece como `2`; o 3 não aparece (casa desconhecida pelo 1) |
-| CA60 | RN13       | `"robos": 0` ou `6`                 | iniciar            | erro de configuração; o programa encerra                         |
-| CA61 | RN14       | início                              | linha vazia        | nada é executado nem mostrado                                    |
-| CA62 | RN16       | 1 em (0,0), 2 em (1,0)              | `1>2 1>2`          | 3 casas novas para o 2; depois nenhuma casa nova                 |
-| CA63 | RN16       | início, 2 robôs                     | `1>2`              | erro: os robôs não estão lado a lado                             |
-| CA64 | RN14, RN16 | 1 em (0,0), 2 em (0,3)              | `1:NN 1>2`         | 1 vai a (0,2), fica ao lado do 2 e envia o mapa                  |
+| CA   | Regra      | Dado                                              | Quando             | Então                                                                         |
+| ---- | ---------- | ------------------------------------------------- | ------------------ | ----------------------------------------------------------------------------- |
+| CA49 | RN13       | limite 21, 8 obstáculos, 7 robôs, várias sementes | iniciar            | robô 1 em (0,0); os outros em casas livres, sem encostar em nenhum robô       |
+| CA50 | RN14       | início                                            | `1:N 2:DN`         | 1 em (0,1) olhando N; 2 em (-2,3) olhando L                                   |
+| CA51 | RN14       | início                                            | `2:DN 2:N`         | 2 em (-2,3) e depois em (-1,3)                                                |
+| CA52 | RN14       | início                                            | `NN`, `0:N`, `1>1` | erro de formato                                                               |
+| CA53 | RN14       | início                                            | `9:N`              | erro: robô 9 não existe                                                       |
+| CA54 | RN14       | início                                            | `1:N 2:X 3:EN`     | 1 em (0,1); erro de comando no 2; 3 em (2,3) olhando O                        |
+| CA55 | RN15       | 1 em (0,0), 2 em (0,2)                            | `1:NN`             | erro de colisão com o robô 2 em (0,2); 1 fica em (0,0)                        |
+| CA56 | RN15       | 1 em (0,0), 2 em (0,2)                            | `1:NNN`            | erro de colisão (não atravessa); 1 fica em (0,0)                              |
+| CA57 | RN14, RN15 | 1 em (0,0), 2 em (0,2)                            | `2:L 1:NN`         | 2 em (1,2); depois 1 em (0,2), porque a casa já ficou livre                   |
+| CA58 | RN12       | início, 2 robôs                                   | `1:NN` e `mapa 2`  | o mapa do 2 não muda: `Explorado: 4 de 49 casas`                              |
+| CA59 | RN12       | 1 em (0,0), 2 em (1,1), 3 em (3,-3)               | `mapa 1`           | o 2 aparece como `2` (está na visão); o 3 não aparece                         |
+| CA65 | RN12       | 1 em (0,0), 2 em (1,-1)                           | `1:NN` e `mapa 1`  | (1,-1) continua conhecida, mas o 2 não aparece mais (saiu da visão do 1)      |
+| CA60 | RN13       | `"robos": 0`, ou `6` com limite 15/17             | iniciar            | erro de configuração; o programa encerra (com limite 18, 6 robôs são aceitos) |
+| CA61 | RN14       | início                                            | linha vazia        | nada é executado nem mostrado                                                 |
+| CA62 | RN16       | 1 em (0,0), 2 em (1,0)                            | `1>2 1>2`          | 3 casas novas para o 2; depois nenhuma casa nova                              |
+| CA63 | RN16       | início, 2 robôs                                   | `1>2`              | erro: os robôs não estão lado a lado                                          |
+| CA64 | RN14, RN16 | 1 em (0,0), 2 em (0,3)                            | `1:NN 1>2`         | 1 vai a (0,2), fica ao lado do 2 e envia o mapa                               |
 
 ## 7. Fora do escopo
 
@@ -199,7 +199,7 @@ Vários robôs (malha com limite 3, sem obstáculos, 3 robôs: 1 em (0,0), 2 em 
 - Giros diferentes de 90° (ex.: meia-volta como letra própria).
 - Robôs se movendo ao mesmo tempo (as ordens rodam em sequência, RN14).
 - Mapa único compartilhado automaticamente por todos os robôs (cada um tem o seu; a troca é pela RN16).
-- Mais de 5 robôs ou escolher onde cada robô nasce.
+- Escolher onde cada robô nasce.
 - Persistência do estado entre execuções do programa (fica só em memória).
 - Malha retangular (largura diferente da altura).
 - Mudar o limite ou os obstáculos com o programa já rodando.
