@@ -1,0 +1,76 @@
+import { useMemo } from 'react';
+import { ApiClient } from './api/client.js';
+import { useSimulation } from './api/useSimulation.js';
+import { ClockControls } from './components/ClockControls.js';
+import { EventLog } from './components/EventLog.js';
+import { OrdersBar } from './components/OrdersBar.js';
+import { RobotPanel } from './components/RobotPanel.js';
+
+const CONNECTION_TEXT = {
+  connecting: 'Conectando',
+  open: 'Conectado',
+  closed: 'Sem conexão, tentando de novo',
+} as const;
+
+export function App() {
+  const api = useMemo(() => new ApiClient(), []);
+  const { update, log, errors, connection, clearError } = useSimulation();
+
+  return (
+    <div className="app">
+      <header className="top">
+        <h1 className="brand">mars-rob</h1>
+        {update !== null && (
+          <ClockControls
+            tick={update.state.tick}
+            clock={update.clock}
+            api={api}
+          />
+        )}
+        <p className={`connection connection-${connection}`}>
+          {CONNECTION_TEXT[connection]}
+        </p>
+      </header>
+
+      {update === null ? (
+        <main className="waiting">
+          <p>
+            Esperando o servidor. Na raiz do projeto, rode{' '}
+            <code>npm run dev -- --servidor</code>.
+          </p>
+        </main>
+      ) : (
+        <>
+          <div className="bar">
+            <OrdersBar api={api} />
+            <p className="grid-summary">
+              Malha de {update.state.fleet.min} a {update.state.fleet.max},{' '}
+              {update.state.fleet.obstacleCount} obstáculos,{' '}
+              {update.state.fleet.robotCount}{' '}
+              {update.state.fleet.robotCount === 1 ? 'robô' : 'robôs'}
+            </p>
+          </div>
+          <div className="workspace">
+            <main className="robots">
+              {update.state.robots.map((robot) => (
+                <RobotPanel
+                  key={robot.id}
+                  robot={robot}
+                  api={api}
+                  runtimeError={errors.get(robot.id) ?? null}
+                  onClearError={() => {
+                    clearError(robot.id);
+                  }}
+                />
+              ))}
+            </main>
+            <EventLog
+              log={log}
+              robotIds={update.state.robots.map((robot) => robot.id)}
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

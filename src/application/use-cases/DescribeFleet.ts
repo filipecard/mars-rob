@@ -1,15 +1,15 @@
 import { toFleetDTO, type FleetDTO } from '../dto.js';
-import type { FleetRepository } from '../ports/FleetRepository.js';
+import type { SimulationRepository } from '../ports/SimulationRepository.js';
 
 // Resumo da malha: limites, quantos obstáculos e quantos robôs
 export class DescribeFleet {
-  readonly #fleets: FleetRepository;
+  readonly #simulations: SimulationRepository;
 
-  constructor(fleets: FleetRepository) {
-    this.#fleets = fleets;
+  constructor(simulations: SimulationRepository) {
+    this.#simulations = simulations;
   }
 
   async execute(): Promise<FleetDTO> {
-    return toFleetDTO(await this.#fleets.get());
+    return toFleetDTO((await this.#simulations.get()).fleet);
   }
 }

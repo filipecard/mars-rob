@@ -1,9 +1,11 @@
 import type {
+  EventDTO,
   OrientationDTO,
   PositionDTO,
   RobotStateDTO,
 } from '../../application/dto.js';
 import type { OrderResult } from '../../application/use-cases/ExecuteOrders.js';
+import type { LoadScriptResult } from '../../application/use-cases/LoadScript.js';
 
 const ORIENTATION_NAMES: Record<OrientationDTO, string> = {
   N: 'Norte',
@@ -18,6 +20,9 @@ export function formatPosition({ x, y }: PositionDTO): string {
 
 const robotName = (id: number): string => `Robô ${String(id)}`;
 
+export const unknownRobot = (id: number): string =>
+  `Não existe robô com ID ${String(id)}`;
+
 export function formatRobotState(robot: RobotStateDTO): string {
   return `${robotName(robot.id)}: posição atual ${formatPosition(robot)} para o ${ORIENTATION_NAMES[robot.orientation]}`;
 }
@@ -29,11 +34,10 @@ function formatNewCells(count: number): string {
   return count === 1 ? '1 casa nova' : `${String(count)} casas novas`;
 }
 
-export function formatOrderResult(result: OrderResult): string {
+// Ordem aceita: não mostra nada (o resultado aparece depois de rodar os ticks)
+export function formatOrderResult(result: OrderResult): string | null {
   if (result.ok) {
-    return result.kind === 'move'
-      ? formatRobotState(result.robot)
-      : `${robotName(result.from)} enviou o mapa para o robô ${String(result.to)}: ${formatNewCells(result.added)}`;
+    return null;
   }
   switch (result.error) {
     case 'INVALID_ORDER':
@@ -41,14 +45,63 @@ export function formatOrderResult(result: OrderResult): string {
     case 'INVALID_COMMAND':
       return `Comando inválido em "${result.input}", permitido apenas as letras (N,S,L,O,D,E)`;
     case 'UNKNOWN_ROBOT':
-      return `Não existe robô com ID ${String(result.robotId)}`;
-    case 'OUT_OF_GRID':
-      return `${robotName(result.robot.id)}: não pode sair do limite da malha`;
-    case 'OBSTACLE':
-      return `${robotName(result.robot.id)}: não pode passar pelo obstáculo em ${formatPosition(result.obstacle)}`;
-    case 'COLLISION':
-      return `${robotName(result.robot.id)}: não pode passar pelo robô ${String(result.other)} em ${formatPosition(result.at)}`;
-    case 'NOT_ADJACENT':
-      return `Os robôs ${String(result.from)} e ${String(result.to)} precisam estar lado a lado para compartilhar o mapa`;
+      return unknownRobot(result.robotId);
   }
+}
+
+// Só o que interessa na CLI: bloqueios, compartilhamentos, print e erros.
+// Passos, giros e esperas aparecem no estado final de cada robô.
+export function formatEvent(event: EventDTO): string | null {
+  const name = robotName(event.robot);
+  switch (event.kind) {
+    case 'moved':
+    case 'turned':
+    case 'waited':
+    case 'finished':
+      return null;
+    case 'blocked':
+      return formatBlocked(event);
+    case 'shared':
+      return `${name} enviou o mapa para o robô ${String(event.to)}: ${formatNewCells(event.added)}`;
+    case 'shareFailed':
+      return formatShareFailed(event);
+    case 'printed':
+      return `${name} diz: ${event.text}`;
+    case 'error':
+      return `${name}: erro no script na linha ${String(event.line)}, coluna ${String(event.column)}: ${event.message}`;
+  }
+}
+
+function formatBlocked(event: EventDTO & { kind: 'blocked' }): string {
+  const name = robotName(event.robot);
+  switch (event.reason) {
+    case 'edge':
+      return `${name}: não pode sair do limite da malha`;
+    case 'obstacle':
+      return `${name}: não pode passar pelo obstáculo em ${formatPosition(event.at)}`;
+    case 'robot':
+      return `${name}: não pode passar pelo robô ${String(event.other)} em ${formatPosition(event.at)}`;
+  }
+}
+
+function formatShareFailed(event: EventDTO & { kind: 'shareFailed' }): string {
+  switch (event.reason) {
+    case 'notAdjacent':
+      return `Os robôs ${String(event.robot)} e ${String(event.to)} precisam estar lado a lado para compartilhar o mapa`;
+    case 'unknownRobot':
+      return `${robotName(event.robot)}: ${unknownRobot(event.to)}`;
+    case 'self':
+      return `${robotName(event.robot)}: não pode enviar o mapa para si mesmo`;
+  }
+}
+
+export function formatLoadScriptResult(
+  result: LoadScriptResult,
+): string | null {
+  if (result.ok) {
+    return null;
+  }
+  return result.error === 'UNKNOWN_ROBOT'
+    ? unknownRobot(result.robotId)
+    : `Erro de sintaxe na linha ${String(result.line)}, coluna ${String(result.column)}: ${result.message}`;
 }

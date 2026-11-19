@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DescribeFleet } from '../../../src/application/use-cases/DescribeFleet.js';
 import { DescribeMap } from '../../../src/application/use-cases/DescribeMap.js';
-import { ExecuteOrders } from '../../../src/application/use-cases/ExecuteOrders.js';
+import { play } from './play.js';
 import { Fleet, type Placement } from '../../../src/domain/entities/Fleet.js';
 import { Grid } from '../../../src/domain/value-objects/Grid.js';
 import { Obstacle } from '../../../src/domain/value-objects/Obstacle.js';
 import { Position } from '../../../src/domain/value-objects/Position.js';
-import { InMemoryFleetRepository } from '../../../src/infrastructure/repositories/InMemoryFleetRepository.js';
+import { InMemorySimulationRepository } from '../../../src/infrastructure/repositories/InMemorySimulationRepository.js';
 
 const at = (x: number, y: number): Position => Position.create(x, y);
 
@@ -21,7 +21,7 @@ const sortCells = <T extends { x: number; y: number }>(cells: T[]): T[] =>
 describe('DescribeFleet', () => {
   it('devolve limites e quantidades, sem dizer onde os robôs estão — RN13', async () => {
     const grid = Grid.square(3, [Obstacle.create([at(2, 1)])]);
-    const repository = new InMemoryFleetRepository(
+    const repository = InMemorySimulationRepository.of(
       Fleet.place(grid, starts(3)),
     );
 
@@ -41,10 +41,10 @@ describe('DescribeMap', () => {
   ]);
 
   it('expõe só as casas que o robô explorou, marcando os obstáculos — RN12', async () => {
-    const repository = new InMemoryFleetRepository(
+    const repository = InMemorySimulationRepository.of(
       Fleet.create(grid, 1, Math.random),
     );
-    await new ExecuteOrders(repository).execute('1:L');
+    await play(repository, '1:L');
 
     const result = await new DescribeMap(repository).execute(1);
 
@@ -62,10 +62,10 @@ describe('DescribeMap', () => {
   });
 
   it('CA58 — cada robô tem o próprio mapa — RN12', async () => {
-    const repository = new InMemoryFleetRepository(
+    const repository = InMemorySimulationRepository.of(
       Fleet.place(Grid.square(3), starts(2)),
     );
-    await new ExecuteOrders(repository).execute('1:NN');
+    await play(repository, '1:NN');
 
     const result = await new DescribeMap(repository).execute(2);
 
@@ -74,7 +74,7 @@ describe('DescribeMap', () => {
   });
 
   it('CA59 — outros robôs aparecem só dentro da visão atual', async () => {
-    const repository = new InMemoryFleetRepository(
+    const repository = InMemorySimulationRepository.of(
       Fleet.place(Grid.square(3), [
         { position: at(0, 0) },
         { position: at(1, 1) },
@@ -90,13 +90,13 @@ describe('DescribeMap', () => {
   });
 
   it('CA65 — um robô visto antes some do mapa quando sai da visão', async () => {
-    const repository = new InMemoryFleetRepository(
+    const repository = InMemorySimulationRepository.of(
       Fleet.place(Grid.square(3), [
         { position: at(0, 0) },
         { position: at(1, -1) },
       ]),
     );
-    await new ExecuteOrders(repository).execute('1:NN');
+    await play(repository, '1:NN');
 
     const result = await new DescribeMap(repository).execute(1);
 
@@ -108,7 +108,7 @@ describe('DescribeMap', () => {
   });
 
   it('robô inexistente', async () => {
-    const repository = new InMemoryFleetRepository();
+    const repository = new InMemorySimulationRepository();
 
     expect(await new DescribeMap(repository).execute(2)).toEqual({
       ok: false,

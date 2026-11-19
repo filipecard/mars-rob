@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { DescribeFleet } from '../../../src/application/use-cases/DescribeFleet.js';
+import { AdvanceClock } from '../../../src/application/use-cases/AdvanceClock.js';
 import { DescribeMap } from '../../../src/application/use-cases/DescribeMap.js';
+import { DescribeSimulation } from '../../../src/application/use-cases/DescribeSimulation.js';
 import { ExecuteOrders } from '../../../src/application/use-cases/ExecuteOrders.js';
+import { LoadScript } from '../../../src/application/use-cases/LoadScript.js';
+import { StopProgram } from '../../../src/application/use-cases/StopProgram.js';
 import { Fleet, type Placement } from '../../../src/domain/entities/Fleet.js';
 import { Grid } from '../../../src/domain/value-objects/Grid.js';
 import { Obstacle } from '../../../src/domain/value-objects/Obstacle.js';
 import { Position } from '../../../src/domain/value-objects/Position.js';
-import { InMemoryFleetRepository } from '../../../src/infrastructure/repositories/InMemoryFleetRepository.js';
-import { runCli } from '../../../src/presentation/cli/runCli.js';
+import { InMemorySimulationRepository } from '../../../src/infrastructure/repositories/InMemorySimulationRepository.js';
+import {
+  CLI_MAX_TICKS,
+  runCli,
+  type CliMode,
+} from '../../../src/presentation/cli/runCli.js';
 
 const at = (x: number, y: number): Position => Position.create(x, y);
 
@@ -20,15 +27,26 @@ const starts = (count: number): Placement[] =>
 async function run(
   lines: string[],
   fleet: Fleet = Fleet.create(Grid.standard(), 1, Math.random),
+  prompts: CliMode[] = [],
 ): Promise<string[]> {
-  const repository = new InMemoryFleetRepository(fleet);
+  const repository = InMemorySimulationRepository.of(fleet);
   const output: string[] = [];
   const useCases = {
     executeOrders: new ExecuteOrders(repository),
-    describeFleet: new DescribeFleet(repository),
     describeMap: new DescribeMap(repository),
+    describeSimulation: new DescribeSimulation(repository),
+    loadScript: new LoadScript(repository),
+    advanceClock: new AdvanceClock(repository),
+    stopProgram: new StopProgram(repository),
   };
-  await runCli(useCases, toAsyncIterable(lines), (text) => output.push(text));
+  await runCli(useCases, toAsyncIterable(lines), {
+    print: (text) => {
+      output.push(text);
+    },
+    prompt: (mode) => {
+      prompts.push(mode);
+    },
+  });
   return output;
 }
 
@@ -42,7 +60,7 @@ async function* toAsyncIterable(lines: string[]): AsyncGenerator<string> {
 const LEGEND =
   'Legenda: ^ > v < robô 1 (para onde olha)   número outro robô   # obstáculo   . livre   ? desconhecido';
 
-describe('runCli', () => {
+describe('runCli — ordens', () => {
   it('imprime a posição após cada ordem válida', async () => {
     expect(await run(['1:N', '1:LL'])).toEqual([
       'Robô 1: posição atual (X: 0, Y: 1) para o Norte',
@@ -58,7 +76,7 @@ describe('runCli', () => {
     expect(await run([input])).toEqual([expected]);
   });
 
-  it('imprime uma linha por ordem', async () => {
+  it('imprime o estado final de cada robô que recebeu ordem', async () => {
     expect(
       await run(['1:N 2:DN'], Fleet.place(Grid.square(3), starts(2))),
     ).toEqual([
@@ -70,14 +88,29 @@ describe('runCli', () => {
   });
 
   it('imprime as mensagens de erro', async () => {
-    expect(
-      await run(['NN', '1:X', '7:N', `1:${'N'.repeat(16)}`, '1>2']),
-    ).toEqual([
+    expect(await run(['NN', '1:X', '7:N', '1>2'])).toEqual([
       'Ordem inválida "NN": use ID:COMANDOS (ex.: 1:NNDE) ou DE>PARA (ex.: 1>2)',
       'Comando inválido em "1:X", permitido apenas as letras (N,S,L,O,D,E)',
       'Não existe robô com ID 7',
-      'Robô 1: não pode sair do limite da malha',
       'Não existe robô com ID 2',
+    ]);
+  });
+
+  it('erros de ordem aparecem antes do resultado das ordens aceitas', async () => {
+    expect(await run(['1:X 1:N'])).toEqual([
+      [
+        'Comando inválido em "1:X", permitido apenas as letras (N,S,L,O,D,E)',
+        'Robô 1: posição atual (X: 0, Y: 1) para o Norte',
+      ].join('\n'),
+    ]);
+  });
+
+  it('o robô para na borda', async () => {
+    expect(await run([`1:${'N'.repeat(16)}`])).toEqual([
+      [
+        'Robô 1: não pode sair do limite da malha',
+        'Robô 1: posição atual (X: 0, Y: 15) para o Norte',
+      ].join('\n'),
     ]);
   });
 
@@ -89,7 +122,10 @@ describe('runCli', () => {
     );
 
     expect(await run(['1:NNNO'], fleet)).toEqual([
-      'Robô 1: não pode passar pelo obstáculo em (X: -1, Y: 3)',
+      [
+        'Robô 1: não pode passar pelo obstáculo em (X: -1, Y: 3)',
+        'Robô 1: posição atual (X: 0, Y: 3) para o Norte',
+      ].join('\n'),
     ]);
   });
 
@@ -100,7 +136,10 @@ describe('runCli', () => {
     ]);
 
     expect(await run(['1:N'], fleet)).toEqual([
-      'Robô 1: não pode passar pelo robô 2 em (X: 0, Y: 1)',
+      [
+        'Robô 1: não pode passar pelo robô 2 em (X: 0, Y: 1)',
+        'Robô 1: posição atual (X: 0, Y: 0) para o Norte',
+      ].join('\n'),
     ]);
   });
 
@@ -111,14 +150,16 @@ describe('runCli', () => {
       { position: at(3, 3) },
     ]);
 
-    expect(await run(['1>2', '2>1 2>1', '1>3'], fleet)).toEqual([
+    const output = await run(['1>2', '2>1 2>1', '1>3'], fleet);
+
+    expect(output.map((text) => text.split('\n')[0])).toEqual([
       'Robô 1 enviou o mapa para o robô 2: 3 casas novas',
-      [
-        'Robô 2 enviou o mapa para o robô 1: 3 casas novas',
-        'Robô 2 enviou o mapa para o robô 1: nenhuma casa nova',
-      ].join('\n'),
+      'Robô 2 enviou o mapa para o robô 1: 3 casas novas',
       'Os robôs 1 e 3 precisam estar lado a lado para compartilhar o mapa',
     ]);
+    expect(output[1]?.split('\n')[1]).toBe(
+      'Robô 2 enviou o mapa para o robô 1: nenhuma casa nova',
+    );
   });
 
   it('linha vazia não imprime nada', async () => {
@@ -130,7 +171,9 @@ describe('runCli', () => {
       'Robô 1: posição atual (X: 0, Y: 1) para o Norte',
     ]);
   });
+});
 
+describe('runCli — mapa', () => {
   it('"mapa 1" mostra o mapa do robô 1 com a legenda', async () => {
     const fleet = Fleet.create(
       Grid.square(1, [Obstacle.create([at(0, 1)])]),
@@ -181,4 +224,115 @@ describe('runCli', () => {
   it('"mapa" de robô inexistente', async () => {
     expect(await run(['mapa 3'])).toEqual(['Não existe robô com ID 3']);
   });
+});
+
+describe('runCli — scripts e relógio — RN17, RN18', () => {
+  it('CA70 — "script 1" recebe linhas até "fim" e roda o script', async () => {
+    const prompts: CliMode[] = [];
+
+    const output = await run(
+      [
+        'script 1',
+        'for (let i = 0; i < 3; i++) {',
+        '  forward()',
+        '}',
+        'print("andei", self.position)',
+        'fim',
+      ],
+      undefined,
+      prompts,
+    );
+
+    expect(output).toEqual([
+      [
+        'Robô 1 diz: andei (0, 3)',
+        'Robô 1: posição atual (X: 0, Y: 3) para o Norte',
+      ].join('\n'),
+    ]);
+    expect(prompts).toEqual([
+      'script',
+      'script',
+      'script',
+      'script',
+      'script',
+      'command',
+    ]);
+  });
+
+  it('erro de sintaxe no script', async () => {
+    expect(await run(['script 1', 'forward(', 'fim'])).toEqual([
+      expect.stringMatching(/^Erro de sintaxe na linha 1, coluna \d+: /),
+    ]);
+  });
+
+  it('erro de execução no script', async () => {
+    expect(await run(['script 1', 'forward()', 'x = 1', 'fim'])).toEqual([
+      [
+        'Robô 1: erro no script na linha 2, coluna 1: "x" não foi declarado (use let x = ...)',
+        'Robô 1: posição atual (X: 0, Y: 1) para o Norte',
+      ].join('\n'),
+    ]);
+  });
+
+  it('"sair" dentro do script é só uma linha do script', async () => {
+    expect(await run(['script 1', 'sair', 'fim'])).toEqual([
+      expect.stringContaining('"sair" não foi declarado'),
+    ]);
+  });
+
+  it.each(['script', 'script x', 'script 1 2'])(
+    '"%s" explica como usar o comando',
+    async (input) => {
+      expect(await run([input])).toEqual([
+        'Use "script ID", escreva o script e termine com uma linha "fim"',
+      ]);
+    },
+  );
+
+  it('script de robô inexistente', async () => {
+    expect(await run(['script 4', 'wait()', 'fim'])).toEqual([
+      'Não existe robô com ID 4',
+    ]);
+  });
+
+  it(`um script sem fim para depois de ${String(CLI_MAX_TICKS)} ticks e continua com "ticks N"`, async () => {
+    const output = await run([
+      'script 1',
+      'while (true) { turnRight() }',
+      'fim',
+      'ticks 2',
+      'parar 1',
+      'ticks 5',
+    ]);
+
+    expect(output).toEqual([
+      [
+        'Robô 1: posição atual (X: 0, Y: 0) para o Norte',
+        'Ainda rodando: robô 1. Use "ticks N" para avançar ou "parar ID" para parar.',
+      ].join('\n'),
+      [
+        'Robô 1: posição atual (X: 0, Y: 0) para o Sul',
+        'Ainda rodando: robô 1. Use "ticks N" para avançar ou "parar ID" para parar.',
+      ].join('\n'),
+      'Robô 1: programa parado',
+      'Nenhum robô está rodando programa',
+    ]);
+  });
+
+  it('"parar" sem programa, de robô inexistente e sem ID', async () => {
+    expect(await run(['parar 1', 'parar 9', 'parar'])).toEqual([
+      'Robô 1: não estava rodando nenhum programa',
+      'Não existe robô com ID 9',
+      'Use "parar ID" para parar o programa de um robô, ex.: parar 1',
+    ]);
+  });
+
+  it.each(['ticks', 'ticks 0', 'ticks x'])(
+    '"%s" explica como usar o comando',
+    async (input) => {
+      expect(await run([input])).toEqual([
+        'Use "ticks N" para avançar até N ticks, ex.: ticks 10',
+      ]);
+    },
+  );
 });

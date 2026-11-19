@@ -1,6 +1,6 @@
-import type { Fleet } from '../../domain/entities/Fleet.js';
+import type { Simulation } from '../../domain/simulation/Simulation.js';
 
-export interface FleetRepository {
-  get(): Promise<Fleet>;
-  save(fleet: Fleet): Promise<void>;
+export interface SimulationRepository {
+  get(): Promise<Simulation>;
+  save(simulation: Simulation): Promise<void>;
 }

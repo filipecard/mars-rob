@@ -1,5 +1,7 @@
 # Plano — robôs programáveis, ticks e frontend
 
+Estado: as 4 fases estão implementadas (2026-11-18). Ficou para depois: classes do usuário na linguagem.
+
 Decisões já tomadas:
 
 - Os scripts são escritos numa linguagem própria, com palavras-chave em inglês e sintaxe de JavaScript/C (chaves).
@@ -9,7 +11,7 @@ Decisões já tomadas:
 - O frontend consome uma API Node com WebSocket e é feito em React + Vite.
 - Testes da interface: só os automatizados de lógica (vitest). A parte visual e os cliques o usuário testa manualmente.
 
-## Fase 1 — Linguagem (interpretador)
+## Fase 1 — Linguagem (interpretador) — feita
 
 Fica em `src/domain/script/`, sem depender de mais nada:
 lexer → parser → AST → interpretador.
@@ -60,14 +62,15 @@ for (let cell of see()) {
 - **Funções nativas:** `type(x)` devolve o tipo da casa ou o tipo do valor (`"number"`, `"string"`, `"list"`...). Também há `print(...)`, `abs`, `min`, `max` e `floor`.
 - **Proteções:** existe um limite de operações sem nenhuma ação dentro de um tick, para que `while (true) {}` não trave o relógio. Os erros de sintaxe e de execução informam linha e coluna.
 
-## Fase 2 — Simulação com ticks
+## Fase 2 — Simulação com ticks — feita
 
 - `Simulation` (domínio): a frota, o programa de cada robô, `tick()` e os eventos do tick (andou, bateu, compartilhou, terminou, erro, print).
 - Ordens `ID:COMANDOS` são compiladas para um programa (`N` → `if (!forward()) stop()` ...).
 - Casos de uso: carregar programa, avançar N ticks, estado da simulação.
 - CLI: depois de cada linha, roda os ticks até todos os programas pararem (com limite). Um comando novo recebe scripts de várias linhas.
+- Como ficou: `src/domain/simulation/` (Simulation, OrderProgram, FleetRobotHost); casos de uso ExecuteOrders (só enfileira), LoadScript, AdvanceClock, StopProgram e DescribeSimulation; CLI com `script ID ... fim`, `ticks N` e `parar ID`.
 
-## Fase 3 — API + WebSocket
+## Fase 3 — API + WebSocket — feita
 
 - Novo adaptador `src/presentation/http/` (servidor Node), ligado no composition root.
 - Rotas:
@@ -76,8 +79,9 @@ for (let cell of see()) {
   - `POST /clock/play`, `/clock/pause` e `/clock/step`
   - `PUT /clock/speed`
 - O WebSocket envia o estado e os eventos a cada tick.
+- Como ficou: `src/presentation/http/` (SimulationController, Clock, startServer, com o pacote `ws`); as rotas ficam sob `/api` (`/api/state`, `/api/orders`, `/api/robots/:id/script`, `/api/robots/:id/stop`, `/api/clock/...`) e o WebSocket em `/ws`. Sobe com `npm run serve`.
 
-## Fase 4 — Frontend (React + Vite, pasta `web/`)
+## Fase 4 — Frontend (React + Vite, pasta `web/`) — feita
 
 - O mapa de cada robô, lado a lado, desenhado a partir do DTO do mapa.
 - Um editor de script por robô, mostrando os erros com linha e coluna.

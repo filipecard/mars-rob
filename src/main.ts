@@ -1,19 +1,28 @@
+import { existsSync } from 'node:fs';
 import process, { argv, stdin, stdout } from 'node:process';
 import { createInterface } from 'node:readline';
+import { fileURLToPath } from 'node:url';
+import { AdvanceClock } from './application/use-cases/AdvanceClock.js';
 import { DescribeFleet } from './application/use-cases/DescribeFleet.js';
 import { DescribeMap } from './application/use-cases/DescribeMap.js';
+import { DescribeSimulation } from './application/use-cases/DescribeSimulation.js';
 import { ExecuteOrders } from './application/use-cases/ExecuteOrders.js';
+import { LoadScript } from './application/use-cases/LoadScript.js';
+import { StopProgram } from './application/use-cases/StopProgram.js';
 import { Fleet } from './domain/entities/Fleet.js';
+import { Simulation } from './domain/simulation/Simulation.js';
 import { generateGrid } from './domain/services/generateGrid.js';
 import { loadConfig } from './infrastructure/config/AppConfig.js';
 import {
   randomSeed,
   seededRandom,
 } from './infrastructure/random/seededRandom.js';
-import { InMemoryFleetRepository } from './infrastructure/repositories/InMemoryFleetRepository.js';
+import { InMemorySimulationRepository } from './infrastructure/repositories/InMemorySimulationRepository.js';
 import { formatWelcome } from './presentation/cli/formatWelcome.js';
 import { parseCliArgs } from './presentation/cli/parseCliArgs.js';
 import { runCli } from './presentation/cli/runCli.js';
+import { SimulationController } from './presentation/http/SimulationController.js';
+import { startServer } from './presentation/http/startServer.js';
 
 // Composition root: único lugar que conhece todas as camadas
 function exitWithError(message: string): never {
@@ -46,18 +55,43 @@ try {
   exitWithError(`Configuração inválida: ${(error as Error).message}`);
 }
 
-const repository = new InMemoryFleetRepository(fleet);
+const repository = new InMemorySimulationRepository(new Simulation(fleet));
 const useCases = {
   executeOrders: new ExecuteOrders(repository),
   describeFleet: new DescribeFleet(repository),
   describeMap: new DescribeMap(repository),
+  describeSimulation: new DescribeSimulation(repository),
+  loadScript: new LoadScript(repository),
+  advanceClock: new AdvanceClock(repository),
+  stopProgram: new StopProgram(repository),
 };
-const rl = createInterface({ input: stdin, output: stdout, prompt: '> ' });
 
-console.log(formatWelcome(await useCases.describeFleet.execute(), seed));
-rl.prompt();
-await runCli(useCases, rl, (text) => {
-  console.log(text);
+const welcome = formatWelcome(await useCases.describeFleet.execute(), seed);
+
+if (args.args.server) {
+  // Interface web: API + WebSocket; serve o frontend compilado, se existir (npm run web:build)
+  const webDist = fileURLToPath(new URL('../web/dist/', import.meta.url));
+  // Só a 1ª linha (malha e semente): os comandos da CLI não valem aqui
+  console.log(welcome.split('\n')[0]);
+  const running = await startServer(new SimulationController(useCases), {
+    port: args.args.port,
+    ...(existsSync(webDist) ? { staticDir: webDist } : {}),
+  });
+  console.log(
+    `Servidor em http://localhost:${String(running.port)} (Ctrl+C encerra)`,
+  );
+} else {
+  console.log(welcome);
+  const rl = createInterface({ input: stdin, output: stdout, prompt: '> ' });
   rl.prompt();
-});
-rl.close();
+  await runCli(useCases, rl, {
+    print: (text) => {
+      console.log(text);
+    },
+    prompt: (mode) => {
+      rl.setPrompt(mode === 'script' ? '... ' : '> ');
+      rl.prompt();
+    },
+  });
+  rl.close();
+}

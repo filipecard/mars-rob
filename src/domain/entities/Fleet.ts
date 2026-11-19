@@ -130,8 +130,14 @@ export class Fleet {
 
   // ID do robô (diferente de `except`) que está na posição
   #occupantAt(position: Position, except: number): number | undefined {
+    const id = this.robotAt(position);
+    return id === except ? undefined : id;
+  }
+
+  // ID do robô que está na posição, ou undefined se a casa está vazia
+  robotAt(position: Position): number | undefined {
     for (const [id, robot] of this.#robots) {
-      if (id !== except && robot.position.equals(position)) {
+      if (robot.position.equals(position)) {
         return id;
       }
     }

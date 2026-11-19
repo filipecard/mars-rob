@@ -1,20 +1,30 @@
-import type { FleetRepository } from '../../application/ports/FleetRepository.js';
+import type { SimulationRepository } from '../../application/ports/SimulationRepository.js';
 import { Fleet } from '../../domain/entities/Fleet.js';
+import { Simulation } from '../../domain/simulation/Simulation.js';
 import { Grid } from '../../domain/value-objects/Grid.js';
 
-export class InMemoryFleetRepository implements FleetRepository {
-  #fleet: Fleet;
+export class InMemorySimulationRepository implements SimulationRepository {
+  #simulation: Simulation;
 
-  constructor(fleet: Fleet = Fleet.create(Grid.standard(), 1, Math.random)) {
-    this.#fleet = fleet;
+  constructor(
+    simulation: Simulation = new Simulation(
+      Fleet.create(Grid.standard(), 1, Math.random),
+    ),
+  ) {
+    this.#simulation = simulation;
   }
 
-  get(): Promise<Fleet> {
-    return Promise.resolve(this.#fleet);
+  // Atalho: uma simulação nova para a frota
+  static of(fleet: Fleet): InMemorySimulationRepository {
+    return new InMemorySimulationRepository(new Simulation(fleet));
   }
 
-  save(fleet: Fleet): Promise<void> {
-    this.#fleet = fleet;
+  get(): Promise<Simulation> {
+    return Promise.resolve(this.#simulation);
+  }
+
+  save(simulation: Simulation): Promise<void> {
+    this.#simulation = simulation;
     return Promise.resolve();
   }
 }

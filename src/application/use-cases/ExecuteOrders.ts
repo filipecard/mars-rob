@@ -1,65 +1,40 @@
-import type { Fleet } from '../../domain/entities/Fleet.js';
-import { CollisionError } from '../../domain/errors/CollisionError.js';
 import { InvalidCommandError } from '../../domain/errors/InvalidCommandError.js';
 import { InvalidOrderError } from '../../domain/errors/InvalidOrderError.js';
-import { NotAdjacentError } from '../../domain/errors/NotAdjacentError.js';
-import { ObstacleError } from '../../domain/errors/ObstacleError.js';
-import { OutOfGridError } from '../../domain/errors/OutOfGridError.js';
 import { UnknownRobotError } from '../../domain/errors/UnknownRobotError.js';
+import type { Action } from '../../domain/script/host.js';
+import { actionsOf } from '../../domain/simulation/Program.js';
+import type { Simulation } from '../../domain/simulation/Simulation.js';
 import {
   parseOrder,
   splitOrders,
-  type MoveOrder,
   type Order,
-  type ShareOrder,
 } from '../../domain/value-objects/Order.js';
-import {
-  toPositionDTO,
-  toRobotStateDTO,
-  type PositionDTO,
-  type RobotStateDTO,
-} from '../dto.js';
-import type { FleetRepository } from '../ports/FleetRepository.js';
+import type { SimulationRepository } from '../ports/SimulationRepository.js';
 
+// Uma ordem aceita só entra na fila do robô: quem a executa é o relógio (AdvanceClock)
 export type OrderResult =
-  | { ok: true; kind: 'move'; robot: RobotStateDTO }
-  | { ok: true; kind: 'share'; from: number; to: number; added: number }
+  | { ok: true; input: string; robotId: number }
   | { ok: false; error: 'INVALID_ORDER' | 'INVALID_COMMAND'; input: string }
-  | { ok: false; error: 'UNKNOWN_ROBOT'; robotId: number }
-  | { ok: false; error: 'OUT_OF_GRID'; robot: RobotStateDTO }
-  | {
-      ok: false;
-      error: 'OBSTACLE';
-      obstacle: PositionDTO;
-      robot: RobotStateDTO;
-    }
-  | {
-      ok: false;
-      error: 'COLLISION';
-      other: number;
-      at: PositionDTO;
-      robot: RobotStateDTO;
-    }
-  | { ok: false; error: 'NOT_ADJACENT'; from: number; to: number };
+  | { ok: false; error: 'UNKNOWN_ROBOT'; input: string; robotId: number };
 
-// RN14: executa as ordens de uma linha em sequência. Cada ordem é independente:
-// uma ordem rejeitada não desfaz as anteriores nem impede as seguintes.
+// RN14/RN17: as ordens de uma linha entram, na ordem, na fila de cada robô.
+// Uma ordem rejeitada não impede as outras.
 export class ExecuteOrders {
-  readonly #fleets: FleetRepository;
+  readonly #simulations: SimulationRepository;
 
-  constructor(fleets: FleetRepository) {
-    this.#fleets = fleets;
+  constructor(simulations: SimulationRepository) {
+    this.#simulations = simulations;
   }
 
   async execute(line: string): Promise<OrderResult[]> {
-    const fleet = await this.#fleets.get();
-    const results = splitOrders(line).map((input) => run(fleet, input));
-    await this.#fleets.save(fleet);
+    const simulation = await this.#simulations.get();
+    const results = splitOrders(line).map((input) => give(simulation, input));
+    await this.#simulations.save(simulation);
     return results;
   }
 }
 
-function run(fleet: Fleet, input: string): OrderResult {
+function give(simulation: Simulation, input: string): OrderResult {
   let order: Order;
   try {
     order = parseOrder(input);
@@ -72,60 +47,26 @@ function run(fleet: Fleet, input: string): OrderResult {
     }
     throw error;
   }
+  const robotId = order.kind === 'move' ? order.robotId : order.from;
+  const actions: Action[] =
+    order.kind === 'move'
+      ? actionsOf(order.command)
+      : [{ kind: 'shareMap', to: order.to }];
   try {
-    return order.kind === 'move' ? move(fleet, order) : share(fleet, order);
+    if (order.kind === 'share') {
+      simulation.fleet.robot(order.to);
+    }
+    simulation.giveOrder(robotId, actions);
   } catch (error) {
     if (error instanceof UnknownRobotError) {
-      return { ok: false, error: 'UNKNOWN_ROBOT', robotId: error.robotId };
-    }
-    throw error;
-  }
-}
-
-function move(fleet: Fleet, { robotId, command }: MoveOrder): OrderResult {
-  const robot = fleet.robot(robotId);
-  try {
-    fleet.move(robotId, command);
-  } catch (error) {
-    const state = toRobotStateDTO(robotId, robot);
-    if (error instanceof OutOfGridError) {
-      return { ok: false, error: 'OUT_OF_GRID', robot: state };
-    }
-    if (error instanceof ObstacleError) {
       return {
         ok: false,
-        error: 'OBSTACLE',
-        obstacle: toPositionDTO(error.position),
-        robot: state,
-      };
-    }
-    if (error instanceof CollisionError) {
-      return {
-        ok: false,
-        error: 'COLLISION',
-        other: error.robotId,
-        at: toPositionDTO(error.position),
-        robot: state,
+        error: 'UNKNOWN_ROBOT',
+        input,
+        robotId: error.robotId,
       };
     }
     throw error;
   }
-  return { ok: true, kind: 'move', robot: toRobotStateDTO(robotId, robot) };
-}
-
-function share(fleet: Fleet, { from, to }: ShareOrder): OrderResult {
-  try {
-    return {
-      ok: true,
-      kind: 'share',
-      from,
-      to,
-      added: fleet.shareMap(from, to),
-    };
-  } catch (error) {
-    if (error instanceof NotAdjacentError) {
-      return { ok: false, error: 'NOT_ADJACENT', from, to };
-    }
-    throw error;
-  }
+  return { ok: true, input, robotId };
 }

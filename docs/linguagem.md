@@ -3,6 +3,14 @@
 Scripts com sintaxe parecida com JavaScript. Cada **ação** gasta 1 tick: o script pausa nela e
 continua no tick seguinte. Sensores e contas não gastam tick.
 
+## Como rodar um script
+
+- Na CLI: `script 1`, as linhas do script e uma linha `fim`. Os ticks rodam até o script terminar
+  (no máximo 1000; depois, `ticks N` avança mais e `parar 1` encerra).
+- Na interface web: escreva no editor do robô, clique em **Rodar script** e toque o relógio.
+
+Carregar um script troca o programa que o robô estava rodando. Uma ordem direta (`1:NN`) troca o script.
+
 ## Exemplo
 
 ```js

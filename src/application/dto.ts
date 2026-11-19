@@ -1,5 +1,9 @@
 import type { Fleet } from '../domain/entities/Fleet.js';
 import type { Robot } from '../domain/entities/Robot.js';
+import type {
+  Simulation,
+  SimulationEvent,
+} from '../domain/simulation/Simulation.js';
 import type { Position } from '../domain/value-objects/Position.js';
 
 // DTOs: dados simples que saem da aplicação. A apresentação não pode importar o domínio.
@@ -78,5 +82,68 @@ export function toMapDTO(fleet: Fleet, id: number): MapDTO {
         (other) => other !== id && robot.canSee(fleet.robot(other).position),
       )
       .map((other) => toRobotStateDTO(other, fleet.robot(other))),
+  };
+}
+
+// RN17: o que aconteceu com um robô num tick (espelha SimulationEvent, com posições simples)
+export type EventDTO = { tick: number; robot: number } & (
+  | { kind: 'moved'; position: PositionDTO; orientation: OrientationDTO }
+  | { kind: 'turned'; position: PositionDTO; orientation: OrientationDTO }
+  | { kind: 'waited' }
+  | {
+      kind: 'blocked';
+      reason: 'edge' | 'obstacle' | 'robot';
+      at: PositionDTO;
+      other: number | null;
+    }
+  | { kind: 'shared'; to: number; added: number }
+  | {
+      kind: 'shareFailed';
+      to: number;
+      reason: 'notAdjacent' | 'unknownRobot' | 'self';
+    }
+  | { kind: 'printed'; text: string }
+  | { kind: 'finished' }
+  | { kind: 'error'; message: string; line: number; column: number }
+);
+
+export type ProgramKindDTO = 'orders' | 'script';
+
+export interface RobotStatusDTO {
+  id: number;
+  // null: o robô está parado, sem programa
+  program: ProgramKindDTO | null;
+  map: MapDTO;
+}
+
+// Tudo o que o frontend desenha: o relógio, a malha e o mapa de cada robô
+export interface SimulationDTO {
+  tick: number;
+  fleet: FleetDTO;
+  robots: RobotStatusDTO[];
+}
+
+export function toEventDTO(event: SimulationEvent): EventDTO {
+  switch (event.kind) {
+    case 'moved':
+    case 'turned':
+      return { ...event, position: toPositionDTO(event.position) };
+    case 'blocked':
+      return { ...event, at: toPositionDTO(event.at) };
+    default:
+      return { ...event };
+  }
+}
+
+export function toSimulationDTO(simulation: Simulation): SimulationDTO {
+  const { fleet } = simulation;
+  return {
+    tick: simulation.tick,
+    fleet: toFleetDTO(fleet),
+    robots: fleet.ids.map((id) => ({
+      id,
+      program: simulation.programOf(id),
+      map: toMapDTO(fleet, id),
+    })),
   };
 }

@@ -10,13 +10,18 @@ const fleet: FleetDTO = {
 };
 
 describe('formatWelcome', () => {
-  it('mostra a malha, a semente, quantos robôs há (sem dizer onde) e as ordens', () => {
+  it('mostra a malha, a semente, quantos robôs há (sem dizer onde) as ordens e os comandos', () => {
     expect(formatWelcome(fleet, 42).split('\n')).toEqual([
       'Malha de -2 a 2 nos dois eixos, 1 obstáculo, 2 robôs (semente 42).',
-      'Ordens (várias na mesma linha, separadas por espaço):',
+      'Ordens (várias na mesma linha, separadas por espaço; cada passo gasta 1 tick):',
       '  ID:COMANDOS  move um robô (passos N, S, L, O; giros D, E), ex.: 1:NNDE',
       '  DE>PARA      envia o mapa de um robô para outro que está ao lado, ex.: 1>2',
-      '"mapa ID" mostra o mapa de um robô e "sair" encerra.',
+      'Comandos:',
+      '  script ID    programa um robô; termine o script com uma linha "fim"',
+      '  ticks N      avança até N ticks',
+      '  parar ID     para o programa de um robô',
+      '  mapa ID      mostra o mapa de um robô',
+      '  sair         encerra',
     ]);
   });
 

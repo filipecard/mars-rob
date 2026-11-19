@@ -4,7 +4,9 @@ import boundaries from 'eslint-plugin-boundaries';
 import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage', 'eslint.config.js', 'vitest.config.ts'] },
+  {
+    ignores: ['**/dist', '**/coverage', 'eslint.config.js', 'vitest.config.ts'],
+  },
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   {
