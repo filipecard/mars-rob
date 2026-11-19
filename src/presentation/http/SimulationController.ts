@@ -2,6 +2,7 @@ import type { EventDTO, SimulationDTO } from '../../application/dto.js';
 import type { AdvanceClock } from '../../application/use-cases/AdvanceClock.js';
 import type { DescribeSimulation } from '../../application/use-cases/DescribeSimulation.js';
 import type { ExecuteOrders } from '../../application/use-cases/ExecuteOrders.js';
+import type { ForgetMap } from '../../application/use-cases/ForgetMap.js';
 import type { LoadScript } from '../../application/use-cases/LoadScript.js';
 import type { StopProgram } from '../../application/use-cases/StopProgram.js';
 import { Clock, type ClockDTO, type Timers } from './Clock.js';
@@ -12,6 +13,7 @@ export interface HttpUseCases {
   loadScript: LoadScript;
   advanceClock: AdvanceClock;
   stopProgram: StopProgram;
+  forgetMap: ForgetMap;
 }
 
 // O que o WebSocket envia a cada mudança: o estado inteiro e os eventos novos
@@ -36,7 +38,7 @@ export interface ApiResponse {
 
 type Listener = (update: UpdateMessage) => void;
 
-const ROBOT_ROUTE = /^\/api\/robots\/([1-9]\d*)\/(script|stop)$/;
+const ROBOT_ROUTE = /^\/api\/robots\/([1-9]\d*)\/(script|stop|forget)$/;
 
 const error = (status: number, message: string): ApiResponse => ({
   status,
@@ -83,9 +85,14 @@ export class SimulationController {
       if (method !== 'POST') {
         return NOT_FOUND;
       }
-      return action === 'script'
-        ? this.#loadScript(Number(id), body)
-        : this.#stop(Number(id));
+      switch (action) {
+        case 'script':
+          return this.#loadScript(Number(id), body);
+        case 'stop':
+          return this.#stop(Number(id));
+        default:
+          return this.#forget(Number(id));
+      }
     }
     switch (`${method} ${path}`) {
       case 'GET /api/state':
@@ -136,6 +143,16 @@ export class SimulationController {
 
   async #stop(id: number): Promise<ApiResponse> {
     const result = await this.#useCases.stopProgram.execute(id);
+    if (!result.ok) {
+      return { status: 404, body: result };
+    }
+    await this.#notify([]);
+    return { status: 200, body: result };
+  }
+
+  // RN20
+  async #forget(id: number): Promise<ApiResponse> {
+    const result = await this.#useCases.forgetMap.execute(id);
     if (!result.ok) {
       return { status: 404, body: result };
     }

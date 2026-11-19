@@ -1,5 +1,6 @@
 import type {
   ClockDTO,
+  ForgetMapResult,
   LoadScriptResult,
   OrderResult,
   StopProgramResult,
@@ -28,6 +29,11 @@ export class ApiClient {
 
   stopProgram(robotId: number): Promise<StopProgramResult> {
     return this.#request('POST', `/api/robots/${String(robotId)}/stop`);
+  }
+
+  // RN20
+  forgetMap(robotId: number): Promise<ForgetMapResult> {
+    return this.#request('POST', `/api/robots/${String(robotId)}/forget`);
   }
 
   play(): Promise<ClockDTO> {

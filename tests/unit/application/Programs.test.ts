@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { AdvanceClock } from '../../../src/application/use-cases/AdvanceClock.js';
 import { DescribeSimulation } from '../../../src/application/use-cases/DescribeSimulation.js';
 import { ExecuteOrders } from '../../../src/application/use-cases/ExecuteOrders.js';
+import { ForgetMap } from '../../../src/application/use-cases/ForgetMap.js';
 import { LoadScript } from '../../../src/application/use-cases/LoadScript.js';
 import { StopProgram } from '../../../src/application/use-cases/StopProgram.js';
 import { Fleet } from '../../../src/domain/entities/Fleet.js';
@@ -119,6 +120,30 @@ describe('DescribeSimulation', () => {
         { id: 1, program: 'orders', map: { robot: { x: 0, y: 1 } } },
         { id: 2, program: 'script', map: { robot: { x: 3, y: 3 } } },
       ],
+    });
+  });
+});
+
+describe('ForgetMap — RN20', () => {
+  it('apaga o mapa e diz quantas casas foram esquecidas', async () => {
+    const repository = repositoryWithTwo();
+    await new ExecuteOrders(repository).execute('1:NN');
+    await new AdvanceClock(repository).execute(10);
+
+    // de (0,0) a (0,2): y de -1 a 3 (15 casas); fica com 9
+    expect(await new ForgetMap(repository).execute(1)).toEqual({
+      ok: true,
+      forgotten: 6,
+    });
+    const state = await new DescribeSimulation(repository).execute();
+    expect(state.robots[0]?.map.explored).toHaveLength(9);
+  });
+
+  it('CA78 — robô inexistente', async () => {
+    expect(await new ForgetMap(repositoryWithTwo()).execute(9)).toEqual({
+      ok: false,
+      error: 'UNKNOWN_ROBOT',
+      robotId: 9,
     });
   });
 });

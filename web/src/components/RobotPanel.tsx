@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ApiClient } from '../api/client.js';
 import type { RobotStatusDTO } from '../api/types.js';
 import type { ScriptErrorInfo } from '../logic/events.js';
@@ -57,11 +57,14 @@ export function RobotPanel({ robot, api, runtimeError, onClearError }: Props) {
         </p>
       </header>
       <MapGrid map={map} />
-      <p className="robot-facts">
-        Em ({map.robot.x}, {map.robot.y}), olhando para o{' '}
-        {ORIENTATION_NAMES[map.robot.orientation]}. Conhece {known} de {total}{' '}
-        casas.
-      </p>
+      <div className="robot-map-row">
+        <p className="robot-facts">
+          Em ({map.robot.x}, {map.robot.y}), olhando para o{' '}
+          {ORIENTATION_NAMES[map.robot.orientation]}. Conhece {known} de {total}{' '}
+          casas.
+        </p>
+        <ForgetMapButton onConfirm={() => void api.forgetMap(robot.id)} />
+      </div>
       <label className="editor-label" htmlFor={editorId}>
         Script
       </label>
@@ -90,5 +93,43 @@ export function RobotPanel({ robot, api, runtimeError, onClearError }: Props) {
         </button>
       </div>
     </article>
+  );
+}
+
+// RN20: apagar o mapa pede confirmação no próprio botão (sem janela do navegador).
+// O pedido some sozinho depois de alguns segundos ou quando o botão perde o foco.
+function ForgetMapButton({ onConfirm }: { onConfirm: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+
+  useEffect(() => {
+    if (!confirming) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      setConfirming(false);
+    }, 4000);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [confirming]);
+
+  return (
+    <button
+      type="button"
+      className={confirming ? 'danger' : undefined}
+      onClick={() => {
+        if (confirming) {
+          setConfirming(false);
+          onConfirm();
+        } else {
+          setConfirming(true);
+        }
+      }}
+      onBlur={() => {
+        setConfirming(false);
+      }}
+    >
+      {confirming ? 'Confirmar: apagar' : 'Apagar mapa'}
+    </button>
   );
 }

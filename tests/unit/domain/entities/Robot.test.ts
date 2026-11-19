@@ -234,6 +234,71 @@ describe('Robot', () => {
     });
   });
 
+  describe('casas visitadas — RN19', () => {
+    it('a casa inicial conta como visitada; as vizinhas só foram vistas', () => {
+      const robot = Robot.create(grid);
+
+      expect(robot.hasVisited(Position.origin())).toBe(true);
+      expect(robot.hasVisited(Position.create(0, 1))).toBe(false);
+    });
+
+    it('cada passo do caminho é visitado; giros não mudam nada', () => {
+      const robot = Robot.create(grid);
+
+      robot.execute(Command.parse('NDN'));
+
+      expect(robot.hasVisited(Position.create(0, 1))).toBe(true);
+      expect(robot.hasVisited(Position.create(1, 1))).toBe(true);
+      expect(robot.hasVisited(Position.create(1, 0))).toBe(false);
+    });
+
+    it('comando rejeitado não visita nada — RN05', () => {
+      const robot = Robot.create(grid);
+
+      expect(() => {
+        robot.execute(Command.parse('N'.repeat(16)));
+      }).toThrow(OutOfGridError);
+      expect(robot.hasVisited(Position.create(0, 1))).toBe(false);
+    });
+
+    it('receber um mapa não marca casas como visitadas — RN16', () => {
+      const robot = Robot.create(grid);
+
+      robot.receiveMap([Position.create(5, 5)]);
+
+      expect(robot.hasExplored(Position.create(5, 5))).toBe(true);
+      expect(robot.hasVisited(Position.create(5, 5))).toBe(false);
+    });
+  });
+
+  describe('apagar o mapa — RN20', () => {
+    it('esquece tudo e volta a conhecer só o 3x3 de onde está', () => {
+      const robot = Robot.create(grid);
+      robot.execute(Command.parse('NNN'));
+
+      // conhecia x de -1 a 1 e y de -1 a 4 (18 casas); fica com o 3x3 de (0,3)
+      expect(robot.forgetMap()).toBe(9);
+      expect(robot.explored).toHaveLength(9);
+      expect(robot.hasExplored(Position.create(0, 0))).toBe(false);
+      expect(robot.hasExplored(Position.create(1, 4))).toBe(true);
+    });
+
+    it('esquece as casas visitadas, menos a casa onde está', () => {
+      const robot = Robot.create(grid);
+      robot.execute(Command.parse('NN'));
+
+      robot.forgetMap();
+
+      expect(robot.hasVisited(Position.create(0, 0))).toBe(false);
+      expect(robot.hasVisited(Position.create(0, 1))).toBe(false);
+      expect(robot.hasVisited(Position.create(0, 2))).toBe(true);
+    });
+
+    it('logo depois de nascer não há nada a esquecer', () => {
+      expect(Robot.create(grid).forgetMap()).toBe(0);
+    });
+  });
+
   describe('outros robôs — RN15', () => {
     const occupiedBy2 = (position: Position): number | undefined =>
       position.equals(Position.create(0, 2)) ? 2 : undefined;

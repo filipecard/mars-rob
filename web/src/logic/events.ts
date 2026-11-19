@@ -57,6 +57,11 @@ export function describeEvent(event: EventDTO): {
             : 'não enviou o mapa: não dá para enviar para si mesmo';
       return { text, tone: 'warn' };
     }
+    case 'forgot':
+      return {
+        text: `apagou o mapa: esqueceu ${String(event.forgotten)} ${event.forgotten === 1 ? 'casa' : 'casas'}`,
+        tone: 'info',
+      };
     case 'printed':
       return { text: event.text, tone: 'print' };
     case 'finished':

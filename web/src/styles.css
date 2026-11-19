@@ -9,6 +9,7 @@
   --muted: #9aa4bb;
   --soil: #c9a36b;
   --soil-deep: #a9854f;
+  --soil-seen: #8a8070;
   --rock: #5a4434;
   --self: #f3f7ff;
   --other: #7fd1c7;
@@ -300,8 +301,13 @@ code {
   background: repeating-linear-gradient(135deg, #222a3d 0 2px, #283149 2px 4px);
 }
 
-.cell-free {
+/* RN19: onde o robô pisou fica no ocre cheio; o que ele só viu, num ocre acinzentado */
+.cell-visited {
   background: var(--soil);
+}
+
+.cell-seen {
+  background: var(--soil-seen);
 }
 
 .cell-obstacle {
@@ -317,6 +323,46 @@ code {
   background: var(--other);
   color: var(--ground);
   font-family: var(--code);
+}
+
+.robot-map-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.robot-map-row button {
+  flex-shrink: 0;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.85rem;
+}
+
+button.danger {
+  border-color: var(--error);
+  color: var(--error);
+}
+
+.map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.map-legend li {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.map-legend .cell {
+  width: 0.8rem;
+  border: 1px solid var(--line);
 }
 
 /* --- editor de script */
@@ -335,7 +381,8 @@ code {
   font-family: var(--code);
   font-size: 0.85rem;
   line-height: 1.5;
-  overflow: hidden;
+  /* visível para a lista de sugestões poder passar da borda do editor */
+  overflow: visible;
 }
 
 .editor:focus-within {
@@ -350,6 +397,7 @@ code {
   text-align: right;
   color: #6b7591;
   background: #212839;
+  border-radius: 4px 0 0 4px;
   overflow: hidden;
   user-select: none;
 }
@@ -361,6 +409,13 @@ code {
 .gutter .gutter-error {
   background: var(--error);
   color: var(--ground);
+}
+
+.editor-body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
 }
 
 .editor textarea {
@@ -376,6 +431,61 @@ code {
   font-size: inherit;
   white-space: pre;
   tab-size: 2;
+}
+
+/* lista de sugestões do autocomplete */
+.completion {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  width: min(24rem, 90vw);
+  background: var(--panel-raised);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 35%);
+}
+
+.completion ul {
+  margin: 0;
+  padding: 0.2rem 0;
+  list-style: none;
+}
+
+.completion li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.1rem 0.6rem;
+  cursor: pointer;
+}
+
+.completion li.active {
+  background: var(--soil);
+  color: var(--ground);
+}
+
+.completion-kind {
+  font-family: var(--ui);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.completion li.active .completion-kind {
+  color: var(--ground);
+}
+
+.completion-detail {
+  padding: 0.4rem 0.6rem;
+  border-top: 1px solid var(--line);
+  font-family: var(--ui);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.completion-detail p {
+  color: var(--muted);
+  margin-top: 0.15rem;
 }
 
 .script-error {
@@ -468,6 +578,128 @@ code {
 
 .log-error .log-text {
   color: var(--error);
+}
+
+/* --- referência da linguagem */
+
+.reference-toggle {
+  margin-left: auto;
+}
+
+.reference-toggle[aria-expanded='true'] {
+  border-color: var(--soil);
+  color: var(--soil);
+}
+
+.reference-toggle + .connection {
+  margin-left: 0;
+}
+
+.reference {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 20;
+  width: min(34rem, 100vw);
+  overflow-y: auto;
+  padding: 1rem 1.25rem 2rem;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  box-shadow: -10px 0 30px rgb(0 0 0 / 35%);
+}
+
+.reference-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.reference-head h2 {
+  font-size: 1.6rem;
+  font-weight: 600;
+  font-stretch: 75%;
+  color: var(--soil);
+}
+
+.reference-search {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.reference-tip,
+.reference-intro {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.reference-tip {
+  margin: 0.6rem 0 0.25rem;
+}
+
+kbd {
+  font-family: var(--code);
+  font-size: 0.8em;
+  padding: 0 0.3em;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--panel-raised);
+}
+
+.reference-section {
+  margin-top: 1.25rem;
+}
+
+.reference-section h3 {
+  margin: 0 0 0.2rem;
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.reference-section dl {
+  margin: 0.5rem 0 0;
+}
+
+.reference-section dl > div {
+  padding: 0.35rem 0;
+  border-bottom: 1px solid #2c3449;
+}
+
+.reference-section dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.9rem;
+}
+
+.reference-example {
+  margin: 0.75rem 0 0;
+}
+
+.reference-example figcaption {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.92rem;
+}
+
+.reference-example figcaption button {
+  padding: 0.15rem 0.6rem;
+  font-size: 0.82rem;
+}
+
+.reference-example pre {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  overflow-x: auto;
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-family: var(--code);
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 @media (max-width: 60rem) {

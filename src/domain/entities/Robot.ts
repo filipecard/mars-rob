@@ -25,6 +25,8 @@ export class Robot {
   #orientation: Orientation;
   // RN12: casas que o robô já viu, pela chave "x,y"
   readonly #explored = new Map<string, Position>();
+  // RN19: casas onde o robô já esteve (a inicial e cada passo dado)
+  readonly #visited = new Set<string>();
 
   private constructor(
     grid: Grid,
@@ -34,6 +36,7 @@ export class Robot {
     this.grid = grid;
     this.#position = position;
     this.#orientation = orientation;
+    this.#visited.add(keyOf(position));
     this.#lookAround(position);
   }
 
@@ -69,6 +72,11 @@ export class Robot {
     return this.#explored.has(keyOf(position));
   }
 
+  // RN19: o robô já esteve na casa (ver não basta)
+  hasVisited(position: Position): boolean {
+    return this.#visited.has(keyOf(position));
+  }
+
   // RN12: a casa está dentro da visão atual (3x3 em volta do robô)
   canSee(position: Position): boolean {
     return (
@@ -87,6 +95,18 @@ export class Robot {
       }
     }
     return added;
+  }
+
+  // RN20: apaga o mapa e as casas visitadas. O robô continua onde está, então volta a
+  // conhecer a própria casa (visitada) e o 3x3 em volta, como ao nascer.
+  // Devolve quantas casas ele deixou de conhecer.
+  forgetMap(): number {
+    const before = this.#explored.size;
+    this.#explored.clear();
+    this.#visited.clear();
+    this.#visited.add(keyOf(this.#position));
+    this.#lookAround(this.#position);
+    return before - this.#explored.size;
   }
 
   // RN16: vizinho pelos lados (sem diagonal)
@@ -128,6 +148,7 @@ export class Robot {
     this.#orientation = orientation;
     // RN12: revela a vizinhança de cada casa do caminho, não só a do destino
     for (const visited of path) {
+      this.#visited.add(keyOf(visited));
       this.#lookAround(visited);
     }
   }

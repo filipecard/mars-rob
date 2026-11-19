@@ -47,6 +47,9 @@ aconteceu: onde cada robô parou, o que o bloqueou, os compartilhamentos e a sa�
 - **RN16** — Compartilhar mapa: `DE>PARA` faz o robô DE enviar o mapa dele para o robô PARA, que soma as casas que ainda não conhecia. Só o receptor muda; para trocar nos dois sentidos, use `1>2 2>1`. Os dois robôs precisam estar lado a lado. Um robô não envia o mapa para si mesmo (`1>1` é formato inválido). Compartilhar gasta 1 tick.
 - **RN17** — Relógio: a simulação anda em ticks. Em cada tick, cada robô com programa faz no máximo uma ação (passo, giro, espera ou compartilhar mapa), em ordem de ID. O tick só conta se algum robô tinha programa. Uma ordem nova entra na fila das ordens do robô; se ele estava rodando um script, a ordem substitui o script. Um programa termina quando acaba, quando dá erro ou quando o operador manda parar. Na CLI, depois de cada linha de ordens ou de um script, os ticks rodam sozinhos até todos os programas terminarem, com limite de 1000 ticks; `ticks N` avança mais. Na interface web, o operador toca, pausa ou avança 1 tick, e escolhe a velocidade (1 a 20 ticks por segundo).
 - **RN18** — Scripts: cada robô pode rodar um script na linguagem descrita em `docs/linguagem.md`. Ações (andar, girar, esperar, compartilhar) gastam 1 tick e devolvem se deram certo; sensores e contas não gastam tick. Os sensores só mostram o que o robô vê agora (visão 3x3) ou o que está no mapa dele (RN12). Erro de sintaxe recusa o script e mantém o programa anterior; erro de execução encerra o script. Os dois informam linha e coluna. Carregar um script substitui o programa que o robô estava rodando.
+- **RN19** — Casas visitadas e desconhecido em volta: cada robô sabe por quais casas já passou. A casa onde nasceu conta como visitada, e cada passo dado também. Ver uma casa de longe não a torna visitada, nem receber um mapa de outro robô (RN16). Para qualquer casa da malha, o script também sabe quantas casas do 3x3 em volta dela (incluindo ela mesma, sem contar as de fora da malha) o robô ainda não conhece, ou seja, quanto ele descobriria se parasse ali. Fora da malha, esse número é 0. No mapa da interface web, o chão onde o robô pisou tem uma cor e o chão que ele só viu tem outra.
+- **RN20** — Apagar o mapa: o robô pode esquecer tudo o que conhece, inclusive as casas visitadas (RN12, RN19). Como continua no mesmo lugar, ele volta a conhecer só a própria casa (como visitada) e o 3x3 em volta, igual a quando nasceu. O operador apaga o mapa pela CLI (`apagar ID`) ou pela interface web; isso não gasta tick nem mexe no programa do robô. Num script, `forgetMap()` é uma ação e gasta 1 tick. Apagar o mapa de um robô não muda o mapa dos outros.
+- **RN21** — Ir até uma casa: num script, `goTo(x, y)` leva o robô até (x, y) pelo menor caminho no mapa dele, calculado uma vez, no começo. Casa desconhecida conta como livre; obstáculos conhecidos e robôs que ele está vendo agora são contornados (um robô no próprio destino não é contornado). O robô anda um passo por tick, sem girar. Se um passo for bloqueado (RN04, RN09, RN15), ele para ali e `goTo` devolve `false`; ao chegar, devolve `true`. Destino fora da malha, num obstáculo conhecido ou sem caminho: devolve `false` sem gastar tick. Já estando no destino: devolve `true` sem gastar tick.
 
 ## 4. Formato da entrada
 
@@ -56,7 +59,7 @@ aconteceu: onde cada robô parou, o que o bloqueou, os compartilhamentos e a sa�
 - Quantidade de passos: sem limite, desde que o robô não saia da malha (RN04).
 - Letras aceitas: `N`, `S`, `L`, `O`, `D`, `E`, somente maiúsculas.
 - Ordem de compartilhamento: `DE>PARA`, ex.: `1>2`. Inválidas: `1>`, `1>1`, `1>2>3`.
-- Comandos do sistema (a linha inteira): `mapa ID` (ex.: `mapa 1`), `script ID` (as linhas seguintes são o script, até uma linha `fim`), `ticks N` (avança até N ticks), `parar ID` e `sair`.
+- Comandos do sistema (a linha inteira): `mapa ID` (ex.: `mapa 1`), `script ID` (as linhas seguintes são o script, até uma linha `fim`), `ticks N` (avança até N ticks), `parar ID`, `apagar ID` e `sair`.
 - Interface web: `npm run dev -- --servidor` (opcional: `--porta 3000`) sobe a API e o WebSocket; a interface fica em `web/` (veja o README).
 
 ### Configuração
@@ -206,13 +209,25 @@ Vários robôs (malha com limite 3, sem obstáculos, 3 robôs colocados direto n
 
 Relógio e scripts (malha com limite 3 ou 15, sem obstáculos, salvo indicação):
 
-| CA   | Regra      | Dado                   | Quando                                     | Então                                                               |
-| ---- | ---------- | ---------------------- | ------------------------------------------ | ------------------------------------------------------------------- |
-| CA66 | RN17       | (0,0)                  | `1:NDN`                                    | 3 ticks de ação (andou, girou, andou) e o fim no 4º                 |
-| CA67 | RN14, RN05 | obstáculo em (0,2)     | `1:NNN 1:L`                                | a 1ª ordem para em (0,1); a 2ª roda e o robô vai a (1,1)            |
-| CA68 | RN17       | 1 em (0,0), 3 em (3,3) | `1:NN 3:SS` e 1 tick                       | os dois deram 1 passo: 1 em (0,1), 3 em (3,2)                       |
-| CA69 | RN18       | início                 | script com erro de sintaxe na linha 2      | script recusado, com linha e coluna; o programa anterior continua   |
-| CA70 | RN18       | (0,0)                  | `script 1`, laço com 3× `forward()`, `fim` | o robô anda 3 casas; a CLI mostra o `print` e a posição final (0,3) |
+| CA   | Regra      | Dado                                       | Quando                                      | Então                                                                                           |
+| ---- | ---------- | ------------------------------------------ | ------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| CA66 | RN17       | (0,0)                                      | `1:NDN`                                     | 3 ticks de ação (andou, girou, andou) e o fim no 4º                                             |
+| CA67 | RN14, RN05 | obstáculo em (0,2)                         | `1:NNN 1:L`                                 | a 1ª ordem para em (0,1); a 2ª roda e o robô vai a (1,1)                                        |
+| CA68 | RN17       | 1 em (0,0), 3 em (3,3)                     | `1:NN 3:SS` e 1 tick                        | os dois deram 1 passo: 1 em (0,1), 3 em (3,2)                                                   |
+| CA69 | RN18       | início                                     | script com erro de sintaxe na linha 2       | script recusado, com linha e coluna; o programa anterior continua                               |
+| CA70 | RN18       | (0,0)                                      | `script 1`, laço com 3× `forward()`, `fim`  | o robô anda 3 casas; a CLI mostra o `print` e a posição final (0,3)                             |
+| CA71 | RN19       | (0,0)                                      | `1:LS`                                      | (0,0), (1,0) e (1,-1) estão visitadas; (0,-1), só vista, não                                    |
+| CA72 | RN19       | (0,0), limite 3                            | `print(front().unknownAround)`              | `3`: só a linha y = 2 do 3x3 de (0,1) é desconhecida                                            |
+| CA73 | RN19       | (0,0), limite 3                            | `print(cellAt(3, 3).unknownAround)`         | `4`: no canto, só 4 casas do 3x3 estão na malha                                                 |
+| CA74 | RN16, RN19 | 1 em (0,0), 2 em (1,0)                     | `1>2`                                       | as casas recebidas pelo 2 ficam conhecidas, mas não visitadas                                   |
+| CA75 | RN20       | (0,0)                                      | `1:NNN` e `apagar 1`                        | `Robô 1 apagou o mapa: 9 casas esquecidas`; conhece só o 3x3 de (0,3), e só (0,3) está visitada |
+| CA76 | RN20       | 1 em (0,0), 2 em (1,0)                     | `1>2` e `apagar 1`                          | o mapa do 2 não muda                                                                            |
+| CA77 | RN20       | (0,0)                                      | script `forward()`, `forgetMap()`           | 2 ticks; o evento diz quantas casas foram esquecidas                                            |
+| CA78 | RN20       | início                                     | `apagar 9`                                  | erro: robô 9 não existe                                                                         |
+| CA79 | RN21       | (0,0), obstáculo em (0,2)                  | script `print(goTo(-1, -2))`                | 3 passos, sem girar; imprime `true` e fica em (-1,-2)                                           |
+| CA80 | RN21       | (0,0), obstáculo em (0,2)                  | script `print(goTo(0, 3))`                  | anda até (0,1), o passo seguinte bate no obstáculo; imprime `false`                             |
+| CA81 | RN21       | 1 em (0,0), 2 em (1,0), obstáculo em (0,1) | `goTo(0, 2)`                                | contorna pela esquerda: 4 passos                                                                |
+| CA82 | RN21       | (0,0)                                      | `goTo(9, 9)` ou `goTo` para obstáculo visto | devolve `false` sem gastar tick                                                                 |
 
 ## 7. Fora do escopo
 

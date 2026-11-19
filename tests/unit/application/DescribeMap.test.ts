@@ -50,7 +50,13 @@ describe('DescribeMap', () => {
 
     // Visão da origem (x de -1 a 1) + visão de (1,0) (x de 0 a 2), y de -1 a 1
     const expected = [-1, 0, 1, 2].flatMap((x) =>
-      [-1, 0, 1].map((y) => ({ x, y, blocked: x === 2 && y === 1 })),
+      [-1, 0, 1].map((y) => ({
+        x,
+        y,
+        blocked: x === 2 && y === 1,
+        // RN19: só a origem e (1,0) foram pisadas
+        visited: y === 0 && (x === 0 || x === 1),
+      })),
     );
     expect(result.ok && sortCells(result.map.explored)).toEqual(
       sortCells(expected),

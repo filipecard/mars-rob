@@ -65,11 +65,20 @@ export function formatEvent(event: EventDTO): string | null {
       return `${name} enviou o mapa para o robô ${String(event.to)}: ${formatNewCells(event.added)}`;
     case 'shareFailed':
       return formatShareFailed(event);
+    case 'forgot':
+      return `${name} apagou o mapa: ${formatForgotten(event.forgotten)}`;
     case 'printed':
       return `${name} diz: ${event.text}`;
     case 'error':
       return `${name}: erro no script na linha ${String(event.line)}, coluna ${String(event.column)}: ${event.message}`;
   }
+}
+
+export function formatForgotten(count: number): string {
+  if (count === 0) {
+    return 'nenhuma casa esquecida';
+  }
+  return count === 1 ? '1 casa esquecida' : `${String(count)} casas esquecidas`;
 }
 
 function formatBlocked(event: EventDTO & { kind: 'blocked' }): string {

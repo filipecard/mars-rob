@@ -274,3 +274,72 @@ describe('Simulation — compartilhar mapa — RN16', () => {
     );
   });
 });
+
+describe('Simulation — apagar o mapa — RN20', () => {
+  it('CA77 — forgetMap() no script gasta 1 tick e diz quantas casas esqueceu', () => {
+    const sim = simulation();
+    sim.loadScript(1, 'forward(); print(forgetMap())');
+
+    const events = runAll(sim);
+
+    expect(summary(events)).toEqual([
+      '1:1:moved',
+      '2:1:forgot',
+      '3:1:printed',
+      '3:1:finished',
+    ]);
+    // de (0,0) para (0,1): conhecia y de -1 a 2 (12 casas); fica com 9
+    expect(events[1]).toMatchObject({ kind: 'forgot', forgotten: 3 });
+    expect(events[2]).toMatchObject({ text: 'true' });
+  });
+
+  it('o operador apaga fora dos ticks, sem mexer no programa nem nos outros robôs', () => {
+    const sim = simulation();
+    sim.loadScript(1, 'forward(); forward()');
+    sim.advance();
+    const otherBefore = sim.fleet.robot(2).explored.length;
+
+    expect(sim.forgetMap(1)).toBe(3);
+    expect(sim.tick).toBe(1);
+    expect(sim.programOf(1)).toBe('script');
+    expect(sim.fleet.robot(2).explored).toHaveLength(otherBefore);
+  });
+
+  it('robô inexistente', () => {
+    expect(() => simulation().forgetMap(9)).toThrow(UnknownRobotError);
+  });
+});
+
+describe('Simulation — goTo — RN21', () => {
+  it('chega ao destino pelo menor caminho, um passo por tick', () => {
+    // de (0,0) a (-1,-2): 3 passos, longe do obstáculo em (0,2)
+    const sim = simulation();
+    sim.loadScript(1, 'print(goTo(-1, -2))');
+
+    const events = runAll(sim);
+
+    expect(events.filter((e) => e.kind === 'moved')).toHaveLength(3);
+    expect(positionOf(sim, 1)).toBe('-1,-2');
+    // não gira: continua olhando para o Norte
+    expect(sim.fleet.robot(1).orientation).toBe('N');
+    expect(events).toContainEqual(
+      expect.objectContaining({ kind: 'printed', text: 'true' }),
+    );
+  });
+
+  it('para quando encontra um obstáculo que não conhecia e devolve false', () => {
+    // (0,2) é obstáculo, mas de (0,0) o robô ainda não o vê
+    const sim = simulation();
+    sim.loadScript(1, 'print(goTo(0, 3), self.position)');
+
+    const events = runAll(sim);
+
+    expect(summary(events)).toEqual([
+      '1:1:moved',
+      '2:1:blocked',
+      '3:1:printed',
+      '3:1:finished',
+    ]);
+    expect(events[2]).toMatchObject({ text: 'false (0, 1)' });
+  });
+});

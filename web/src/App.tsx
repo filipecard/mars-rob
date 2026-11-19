@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { ApiClient } from './api/client.js';
 import { useSimulation } from './api/useSimulation.js';
 import { ClockControls } from './components/ClockControls.js';
 import { EventLog } from './components/EventLog.js';
 import { OrdersBar } from './components/OrdersBar.js';
+import { ReferencePanel } from './components/ReferencePanel.js';
 import { RobotPanel } from './components/RobotPanel.js';
 
 const CONNECTION_TEXT = {
@@ -15,6 +16,10 @@ const CONNECTION_TEXT = {
 export function App() {
   const api = useMemo(() => new ApiClient(), []);
   const { update, log, errors, connection, clearError } = useSimulation();
+  const [showReference, setShowReference] = useState(false);
+  const closeReference = useCallback(() => {
+    setShowReference(false);
+  }, []);
 
   return (
     <div className="app">
@@ -27,6 +32,16 @@ export function App() {
             api={api}
           />
         )}
+        <button
+          type="button"
+          className="reference-toggle"
+          aria-expanded={showReference}
+          onClick={() => {
+            setShowReference((open) => !open);
+          }}
+        >
+          Referência
+        </button>
         <p className={`connection connection-${connection}`}>
           {CONNECTION_TEXT[connection]}
         </p>
@@ -71,6 +86,7 @@ export function App() {
           </div>
         </>
       )}
+      {showReference && <ReferencePanel onClose={closeReference} />}
     </div>
   );
 }

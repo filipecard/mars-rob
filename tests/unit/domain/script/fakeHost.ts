@@ -4,6 +4,7 @@ import type {
   RobotHost,
   SelfInfo,
   Side,
+  StepKind,
 } from '../../../../src/domain/script/host.js';
 import {
   ScriptProcess,
@@ -17,13 +18,24 @@ export class FakeHost implements RobotHost {
   cells: Partial<Record<Side, CellInfo>> = {};
   visible: CellInfo[] = [];
   known = 9;
+  path: StepKind[] | null = [];
+  pathRequests: [number, number][] = [];
 
   self(): SelfInfo {
     return { ...this.state };
   }
 
   look(side: Side): CellInfo {
-    return this.cells[side] ?? { type: 'empty', x: 0, y: 1, robot: null };
+    return (
+      this.cells[side] ?? {
+        type: 'empty',
+        x: 0,
+        y: 1,
+        robot: null,
+        visited: false,
+        unknownAround: 0,
+      }
+    );
   }
 
   see(): CellInfo[] {
@@ -31,11 +43,23 @@ export class FakeHost implements RobotHost {
   }
 
   cellAt(x: number, y: number): CellInfo {
-    return { type: 'unknown', x, y, robot: null };
+    return {
+      type: 'unknown',
+      x,
+      y,
+      robot: null,
+      visited: false,
+      unknownAround: 0,
+    };
   }
 
   explored(): number {
     return this.known;
+  }
+
+  pathTo(x: number, y: number): StepKind[] | null {
+    this.pathRequests.push([x, y]);
+    return this.path;
   }
 
   print(text: string): void {

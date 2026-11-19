@@ -2,6 +2,7 @@ import { AdvanceClock } from '../../../../src/application/use-cases/AdvanceClock
 import { DescribeSimulation } from '../../../../src/application/use-cases/DescribeSimulation.js';
 import { ExecuteOrders } from '../../../../src/application/use-cases/ExecuteOrders.js';
 import { LoadScript } from '../../../../src/application/use-cases/LoadScript.js';
+import { ForgetMap } from '../../../../src/application/use-cases/ForgetMap.js';
 import { StopProgram } from '../../../../src/application/use-cases/StopProgram.js';
 import { Fleet } from '../../../../src/domain/entities/Fleet.js';
 import { Grid } from '../../../../src/domain/value-objects/Grid.js';
@@ -28,6 +29,7 @@ export function controller(timers?: Timers): SimulationController {
       loadScript: new LoadScript(repository),
       advanceClock: new AdvanceClock(repository),
       stopProgram: new StopProgram(repository),
+      forgetMap: new ForgetMap(repository),
     },
     timers === undefined ? {} : { timers },
   );

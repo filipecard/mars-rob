@@ -4,6 +4,7 @@ import { DescribeMap } from '../../../src/application/use-cases/DescribeMap.js';
 import { DescribeSimulation } from '../../../src/application/use-cases/DescribeSimulation.js';
 import { ExecuteOrders } from '../../../src/application/use-cases/ExecuteOrders.js';
 import { LoadScript } from '../../../src/application/use-cases/LoadScript.js';
+import { ForgetMap } from '../../../src/application/use-cases/ForgetMap.js';
 import { StopProgram } from '../../../src/application/use-cases/StopProgram.js';
 import { Fleet, type Placement } from '../../../src/domain/entities/Fleet.js';
 import { Grid } from '../../../src/domain/value-objects/Grid.js';
@@ -38,6 +39,7 @@ async function run(
     loadScript: new LoadScript(repository),
     advanceClock: new AdvanceClock(repository),
     stopProgram: new StopProgram(repository),
+    forgetMap: new ForgetMap(repository),
   };
   await runCli(useCases, toAsyncIterable(lines), {
     print: (text) => {
@@ -324,6 +326,31 @@ describe('runCli — scripts e relógio — RN17, RN18', () => {
       'Robô 1: não estava rodando nenhum programa',
       'Não existe robô com ID 9',
       'Use "parar ID" para parar o programa de um robô, ex.: parar 1',
+    ]);
+  });
+
+  it('CA75 — "apagar 1" apaga o mapa do robô — RN20', async () => {
+    const output = await run(['1:NNN', 'apagar 1', 'mapa 1']);
+
+    expect(output[1]).toBe('Robô 1 apagou o mapa: 9 casas esquecidas');
+    expect(output[2]).toContain('Explorado: 9 de 961 casas');
+  });
+
+  it('CA76 — apagar o mapa de um robô não muda o dos outros — RN20', async () => {
+    const fleet = Fleet.place(Grid.standard(), [
+      { position: at(0, 0) },
+      { position: at(1, 0) },
+    ]);
+    const output = await run(['1>2', 'apagar 1', 'apagar 2'], fleet);
+
+    expect(output[1]).toBe('Robô 1 apagou o mapa: nenhuma casa esquecida');
+    expect(output[2]).toBe('Robô 2 apagou o mapa: 3 casas esquecidas');
+  });
+
+  it('CA78 — "apagar" de robô inexistente e sem ID', async () => {
+    expect(await run(['apagar 9', 'apagar'])).toEqual([
+      'Não existe robô com ID 9',
+      'Use "apagar ID" para apagar o mapa de um robô, ex.: apagar 1',
     ]);
   });
 

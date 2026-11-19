@@ -23,6 +23,8 @@ export interface RobotStateDTO extends PositionDTO {
 
 export interface CellDTO extends PositionDTO {
   blocked: boolean;
+  // RN19: o robô já esteve nesta casa (e não só a viu)
+  visited: boolean;
 }
 
 // Resumo da malha. RN13: diz quantos robôs há, mas não onde estão.
@@ -75,6 +77,7 @@ export function toMapDTO(fleet: Fleet, id: number): MapDTO {
     explored: robot.explored.map((cell) => ({
       ...toPositionDTO(cell),
       blocked: grid.isBlocked(cell),
+      visited: robot.hasVisited(cell),
     })),
     robot: toRobotStateDTO(id, robot),
     others: fleet.ids
@@ -102,6 +105,7 @@ export type EventDTO = { tick: number; robot: number } & (
       to: number;
       reason: 'notAdjacent' | 'unknownRobot' | 'self';
     }
+  | { kind: 'forgot'; forgotten: number }
   | { kind: 'printed'; text: string }
   | { kind: 'finished' }
   | { kind: 'error'; message: string; line: number; column: number }

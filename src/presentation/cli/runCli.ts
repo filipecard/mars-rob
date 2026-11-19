@@ -2,11 +2,13 @@ import type { AdvanceClock } from '../../application/use-cases/AdvanceClock.js';
 import type { DescribeMap } from '../../application/use-cases/DescribeMap.js';
 import type { DescribeSimulation } from '../../application/use-cases/DescribeSimulation.js';
 import type { ExecuteOrders } from '../../application/use-cases/ExecuteOrders.js';
+import type { ForgetMap } from '../../application/use-cases/ForgetMap.js';
 import type { LoadScript } from '../../application/use-cases/LoadScript.js';
 import type { StopProgram } from '../../application/use-cases/StopProgram.js';
 import { formatMapView } from './formatMap.js';
 import {
   formatEvent,
+  formatForgotten,
   formatLoadScriptResult,
   formatOrderResult,
   formatRobotState,
@@ -19,6 +21,7 @@ export const SCRIPT_COMMAND = 'script';
 export const SCRIPT_END = 'fim';
 export const TICKS_COMMAND = 'ticks';
 export const STOP_COMMAND = 'parar';
+export const FORGET_COMMAND = 'apagar';
 
 // Depois de cada ordem ou script, a CLI roda os ticks até todos pararem, com este limite
 export const CLI_MAX_TICKS = 1000;
@@ -27,6 +30,8 @@ export const MAP_USAGE = `Use "${MAP_COMMAND} ID" para ver o mapa de um robô, e
 export const SCRIPT_USAGE = `Use "${SCRIPT_COMMAND} ID", escreva o script e termine com uma linha "${SCRIPT_END}"`;
 export const TICKS_USAGE = `Use "${TICKS_COMMAND} N" para avançar até N ticks, ex.: ${TICKS_COMMAND} 10`;
 export const STOP_USAGE = `Use "${STOP_COMMAND} ID" para parar o programa de um robô, ex.: ${STOP_COMMAND} 1`;
+
+export const FORGET_USAGE = `Use "${FORGET_COMMAND} ID" para apagar o mapa de um robô, ex.: ${FORGET_COMMAND} 1`;
 
 const ID_PATTERN = /^[1-9]\d*$/;
 
@@ -37,6 +42,7 @@ export interface CliUseCases {
   loadScript: LoadScript;
   advanceClock: AdvanceClock;
   stopProgram: StopProgram;
+  forgetMap: ForgetMap;
 }
 
 // 'script': a CLI está recebendo as linhas de um script
@@ -100,6 +106,8 @@ class Session {
           : TICKS_USAGE;
       case STOP_COMMAND:
         return this.#stop(argument);
+      case FORGET_COMMAND:
+        return this.#forget(argument);
       default:
         return this.#orders(line);
     }
@@ -141,6 +149,18 @@ class Session {
     return result.stopped
       ? `Robô ${argument}: programa parado`
       : `Robô ${argument}: não estava rodando nenhum programa`;
+  }
+
+  // RN20
+  async #forget(argument: string): Promise<string> {
+    if (!ID_PATTERN.test(argument)) {
+      return FORGET_USAGE;
+    }
+    const result = await this.#useCases.forgetMap.execute(Number(argument));
+    if (!result.ok) {
+      return unknownRobot(result.robotId);
+    }
+    return `Robô ${argument} apagou o mapa: ${formatForgotten(result.forgotten)}`;
   }
 
   // Linha vazia: nenhuma ordem, nada a mostrar

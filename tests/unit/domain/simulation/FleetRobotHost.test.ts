@@ -38,8 +38,16 @@ describe('FleetRobotHost — RN18', () => {
       x: 0,
       y: 1,
       robot: null,
+      visited: false,
+      // (−1,2), (0,2) e (1,2) ainda não foram vistas
+      unknownAround: 3,
     });
-    expect(host.look('right')).toEqual({ type: 'robot', x: 1, y: 0, robot: 2 });
+    expect(host.look('right')).toMatchObject({
+      type: 'robot',
+      x: 1,
+      y: 0,
+      robot: 2,
+    });
     expect(host.look('back')).toMatchObject({ type: 'empty', x: 0, y: -1 });
     expect(host.look('left')).toMatchObject({ type: 'empty', x: -1, y: 0 });
   });
@@ -85,8 +93,38 @@ describe('FleetRobotHost — RN18', () => {
       x: 3,
       y: 3,
       robot: null,
+      visited: false,
+      // canto da malha: só (2,2), (2,3), (3,2) e (3,3) existem, todas desconhecidas
+      unknownAround: 4,
     });
-    expect(host.cellAt(9, 9).type).toBe('edge');
+    expect(host.cellAt(9, 9)).toEqual({
+      type: 'edge',
+      x: 9,
+      y: 9,
+      robot: null,
+      visited: false,
+      unknownAround: 0,
+    });
+  });
+
+  it('visited: só as casas onde o robô esteve, não as que ele só viu — RN19', () => {
+    const { fleet, host } = setup();
+    fleet.move(1, Command.parse('OS'));
+
+    expect(host.cellAt(0, 0).visited).toBe(true);
+    expect(host.cellAt(-1, 0).visited).toBe(true);
+    expect(host.cellAt(-1, -1).visited).toBe(true);
+    // vista, mas nunca pisada
+    expect(host.cellAt(0, -1)).toMatchObject({ type: 'empty', visited: false });
+  });
+
+  it('unknownAround: 0 quando o 3x3 da casa já é todo conhecido — RN19', () => {
+    const { host } = setup();
+
+    // (0,0) é o centro da visão inicial: tudo em volta já foi visto
+    expect(host.cellAt(0, 0).unknownAround).toBe(0);
+    // (1,1): a coluna x = 2 e a linha y = 2 ainda são desconhecidas
+    expect(host.cellAt(1, 1).unknownAround).toBe(5);
   });
 
   it('cellAt: casa conhecida fora da visão não mostra robôs', () => {
@@ -105,5 +143,69 @@ describe('FleetRobotHost — RN18', () => {
 
     expect(host.explored()).toBe(9);
     expect(printed).toEqual(['oi']);
+  });
+});
+
+describe('FleetRobotHost.pathTo — RN21', () => {
+  it('menor caminho contornando o obstáculo conhecido e o robô visível', () => {
+    const { host } = setup();
+
+    // (0,1) é obstáculo e o 2 está em (1,0): sai pela esquerda
+    expect(host.pathTo(0, 2)).toEqual([
+      'stepLeft',
+      'forward',
+      'forward',
+      'stepRight',
+    ]);
+  });
+
+  it('os passos são relativos à orientação do robô', () => {
+    const { fleet, host } = setup();
+    fleet.move(1, Command.parse('D'));
+
+    // olhando para o Leste, o Sul fica à direita
+    expect(host.pathTo(0, -2)).toEqual(['stepRight', 'stepRight']);
+  });
+
+  it('casa desconhecida conta como livre', () => {
+    const { host } = setup();
+
+    expect(host.pathTo(-1, 3)).toEqual([
+      'stepLeft',
+      'forward',
+      'forward',
+      'forward',
+    ]);
+  });
+
+  it('robô no destino: o caminho vai até ele (o último passo vai falhar)', () => {
+    const { host } = setup();
+
+    expect(host.pathTo(1, 0)).toEqual(['stepRight']);
+  });
+
+  it('já no destino: nenhum passo', () => {
+    expect(setup().host.pathTo(0, 0)).toEqual([]);
+  });
+
+  it('sem caminho: destino fora da malha ou num obstáculo conhecido', () => {
+    const { host } = setup();
+
+    expect(host.pathTo(9, 9)).toBeNull();
+    expect(host.pathTo(0, 1)).toBeNull();
+  });
+
+  it('cercado por obstáculos conhecidos e robôs visíveis: sem caminho', () => {
+    // 1 em (0,0); obstáculo em (0,1) e (-1,0); 2 em (1,0) e 3 em (0,-1)
+    const fleet = Fleet.place(
+      Grid.square(3, [
+        Obstacle.create([at(0, 1)]),
+        Obstacle.create([at(-1, 0)]),
+      ]),
+      [{ position: at(0, 0) }, { position: at(1, 0) }, { position: at(0, -1) }],
+    );
+    const host = new FleetRobotHost(fleet, 1, () => undefined);
+
+    expect(host.pathTo(3, 3)).toBeNull();
   });
 });

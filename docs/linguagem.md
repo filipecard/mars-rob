@@ -8,6 +8,10 @@ continua no tick seguinte. Sensores e contas não gastam tick.
 - Na CLI: `script 1`, as linhas do script e uma linha `fim`. Os ticks rodam até o script terminar
   (no máximo 1000; depois, `ticks N` avança mais e `parar 1` encerra).
 - Na interface web: escreva no editor do robô, clique em **Rodar script** e toque o relógio.
+  O botão **Referência**, no topo, abre esta referência com busca e exemplos para copiar.
+  O editor sugere nomes enquanto você digita (inclusive as variáveis e funções do próprio script
+  e, depois de um ponto, os campos): **Ctrl+Espaço** abre a lista, **↑/↓** escolhem, **Enter** ou
+  **Tab** aceitam e **Esc** fecha.
 
 Carregar um script troca o programa que o robô estava rodando. Uma ordem direta (`1:NN`) troca o script.
 
@@ -67,7 +71,25 @@ Cada ação devolve `true` se deu certo e `false` se não deu (ex.: andar contra
 | `turnLeft()`   | gira 90° para a esquerda                              |
 | `wait()`       | fica parado um tick                                   |
 | `shareMap(id)` | envia o mapa para o robô `id` (precisa estar ao lado) |
+| `forgetMap()`  | apaga o mapa do robô (ver abaixo)                     |
+| `goTo(x, y)`   | vai até (x, y), 1 passo por tick (ver abaixo)         |
 | `stop()`       | encerra o programa (não gasta tick)                   |
+
+`goTo(x, y)` leva o robô até a casa (x, y) pelo menor caminho no mapa dele, um passo por tick e
+sem girar (anda de frente, de costas ou de lado). Casa desconhecida conta como livre, e ele não passa
+por obstáculos que conhece nem por robôs que está vendo. O caminho é calculado uma vez, no começo:
+se um passo for bloqueado (um obstáculo que ele não conhecia, outro robô, a borda), ele para ali e
+`goTo` devolve `false`. Ao chegar, devolve `true`. Se o destino está fora da malha, é um obstáculo
+conhecido ou não há caminho, devolve `false` sem gastar tick.
+
+```js
+if (!goTo(5, 5)) {
+  print('parei em', self.position);
+}
+```
+
+`forgetMap()` faz o robô esquecer o mapa e as casas visitadas. Como ele continua no mesmo
+lugar, volta a conhecer a própria casa (como visitada) e o 3x3 em volta, igual a quando nasceu.
 
 ## Sensores (não gastam tick)
 
@@ -79,8 +101,29 @@ Cada ação devolve `true` se deu certo e `false` se não deu (ex.: andar contra
 | `explored()`                             | quantas casas o robô já conhece                                                                           |
 | `self`                                   | o próprio robô: `self.id`, `self.position`, `self.orientation` (`"north"`, `"east"`, `"south"`, `"west"`) |
 
-Uma **casa** tem: `type` (`"empty"`, `"obstacle"`, `"robot"`, `"edge"` fora da malha, `"unknown"`),
-`isEmpty`, `position` (`.x`, `.y`) e `robot` (o ID do robô que está nela, ou `null`).
+Uma **casa** tem:
+
+| Campo           | O que é                                                                                  |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| `type`          | `"empty"`, `"obstacle"`, `"robot"`, `"edge"` (fora da malha) ou `"unknown"`              |
+| `isEmpty`       | `true` se a casa está livre                                                              |
+| `isUnknown`     | `true` se o robô ainda não viu a casa                                                    |
+| `visited`       | `true` se o robô já esteve nela (ver de longe ou receber o mapa não conta)               |
+| `unknownAround` | quantas casas desconhecidas há no 3x3 dela (0 a 9): o que o robô descobriria parando ali |
+| `position`      | a posição (`.x`, `.y`)                                                                   |
+| `robot`         | o ID do robô que está nela, ou `null`                                                    |
+
+As casas vizinhas (`front()` etc.) estão sempre na visão, então nunca são `"unknown"`. Para
+explorar, olhe o `unknownAround` delas, ou use `cellAt(x, y)` para casas mais longe:
+
+```js
+// vai para o lado que revela mais casas novas
+if (left().isEmpty && left().unknownAround > front().unknownAround) {
+  turnLeft();
+}
+if (front().isEmpty) forward();
+else turnRight();
+```
 
 ## Funções
 

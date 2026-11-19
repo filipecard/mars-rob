@@ -93,6 +93,7 @@ Comandos do sistema:
 | `script ID` | as próximas linhas são um script para o robô `ID`, até uma linha `fim` |
 | `ticks N`   | avança até N ticks (para scripts que ainda estão rodando)              |
 | `parar ID`  | para o programa do robô `ID`                                           |
+| `apagar ID` | apaga o mapa do robô `ID` (ele volta a conhecer só o 3x3 em volta)     |
 | `sair`      | encerra o programa                                                     |
 
 Depois de cada linha de ordens ou de um script, a CLI roda os ticks até todos os robôs pararem

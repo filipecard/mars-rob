@@ -109,6 +109,27 @@ describe('SimulationController — rotas', () => {
     ).toMatchObject({ status: 404 });
   });
 
+  it('POST /api/robots/:id/forget apaga o mapa — RN20', async () => {
+    const api = controller();
+    const updates = collect(api);
+
+    expect(
+      await api.handle({
+        method: 'POST',
+        path: '/api/robots/1/forget',
+        body: undefined,
+      }),
+    ).toEqual({ status: 200, body: { ok: true, forgotten: 0 } });
+    expect(updates).toHaveLength(1);
+    expect(
+      await api.handle({
+        method: 'POST',
+        path: '/api/robots/8/forget',
+        body: undefined,
+      }),
+    ).toMatchObject({ status: 404 });
+  });
+
   it.each([
     ['/api/orders', undefined],
     ['/api/orders', { line: 3 }],

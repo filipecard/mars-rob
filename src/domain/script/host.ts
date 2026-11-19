@@ -13,7 +13,12 @@ export type Action =
         | 'turnLeft'
         | 'wait';
     }
-  | { kind: 'shareMap'; to: number };
+  | { kind: 'shareMap'; to: number }
+  // RN20: apaga o mapa do próprio robô
+  | { kind: 'forgetMap' };
+
+// Os passos que não giram o robô (goTo anda só com eles)
+export type StepKind = 'forward' | 'backward' | 'stepRight' | 'stepLeft';
 
 export type CellType = 'empty' | 'obstacle' | 'robot' | 'edge' | 'unknown';
 
@@ -23,6 +28,10 @@ export interface CellInfo {
   y: number;
   // ID do robô na casa, se houver
   robot: number | null;
+  // RN19: o robô já esteve nesta casa
+  visited: boolean;
+  // RN19: quantas casas desconhecidas há no 3x3 desta casa (o que o robô descobriria parando nela)
+  unknownAround: number;
 }
 
 export type Heading = 'north' | 'east' | 'south' | 'west';
@@ -47,5 +56,8 @@ export interface RobotHost {
   cellAt(x: number, y: number): CellInfo;
   // Quantas casas o robô conhece
   explored(): number;
+  // RN21: o menor caminho até (x, y) pelo mapa do robô, em passos sem giro.
+  // [] se ele já está lá; null se não há caminho conhecido.
+  pathTo(x: number, y: number): StepKind[] | null;
   print(text: string): void;
 }

@@ -8,6 +8,7 @@ import { DescribeMap } from './application/use-cases/DescribeMap.js';
 import { DescribeSimulation } from './application/use-cases/DescribeSimulation.js';
 import { ExecuteOrders } from './application/use-cases/ExecuteOrders.js';
 import { LoadScript } from './application/use-cases/LoadScript.js';
+import { ForgetMap } from './application/use-cases/ForgetMap.js';
 import { StopProgram } from './application/use-cases/StopProgram.js';
 import { Fleet } from './domain/entities/Fleet.js';
 import { Simulation } from './domain/simulation/Simulation.js';
@@ -64,6 +65,7 @@ const useCases = {
   loadScript: new LoadScript(repository),
   advanceClock: new AdvanceClock(repository),
   stopProgram: new StopProgram(repository),
+  forgetMap: new ForgetMap(repository),
 };
 
 const welcome = formatWelcome(await useCases.describeFleet.execute(), seed);

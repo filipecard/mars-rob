@@ -1,6 +1,8 @@
 import type { MapDTO, OrientationDTO } from '../api/types.js';
 
-export type CellKind = 'unknown' | 'free' | 'obstacle' | 'self' | 'other';
+// RN19: 'visited' é chão onde o robô já pisou; 'seen' é chão que ele só viu de perto
+export type CellKind =
+  'unknown' | 'visited' | 'seen' | 'obstacle' | 'self' | 'other';
 
 export interface MapCell {
   x: number;
@@ -15,7 +17,7 @@ const key = (x: number, y: number): string => `${String(x)},${String(y)}`;
 
 // Norte para cima: a primeira linha é y = max. Mesmas regras do mapa da CLI (RN12).
 export function mapRows(map: MapDTO): MapCell[][] {
-  const known = new Map(map.explored.map((c) => [key(c.x, c.y), c.blocked]));
+  const known = new Map(map.explored.map((c) => [key(c.x, c.y), c]));
   const others = new Map(map.others.map((r) => [key(r.x, r.y), r]));
   const rows: MapCell[][] = [];
   for (let y = map.max; y >= map.min; y--) {
@@ -48,9 +50,15 @@ export function mapRows(map: MapDTO): MapCell[][] {
         orientation: other.orientation,
       };
     }
-    const blocked = known.get(key(x, y));
+    const cell = known.get(key(x, y));
     const kind: CellKind =
-      blocked === undefined ? 'unknown' : blocked ? 'obstacle' : 'free';
+      cell === undefined
+        ? 'unknown'
+        : cell.blocked
+          ? 'obstacle'
+          : cell.visited
+            ? 'visited'
+            : 'seen';
     return { x, y, kind, robotId: null, orientation: null };
   }
 }

@@ -16,15 +16,17 @@ import {
   saveScript,
 } from '../src/logic/scripts.js';
 
-// Malha de -1 a 1; robô 1 em (0,0) olhando L; robô 2 visível em (1,1); obstáculo em (-1,1)
+// Malha de -1 a 1; robô 1 em (0,0) olhando L; robô 2 visível em (1,1); obstáculo em (-1,1).
+// O robô 1 pisou em (0,1) e (0,0); (-1,0) ele só viu.
 const map: MapDTO = {
   min: -1,
   max: 1,
   explored: [
-    { x: -1, y: 1, blocked: true },
-    { x: 0, y: 1, blocked: false },
-    { x: 1, y: 1, blocked: false },
-    { x: 0, y: 0, blocked: false },
+    { x: -1, y: 1, blocked: true, visited: false },
+    { x: 0, y: 1, blocked: false, visited: true },
+    { x: 1, y: 1, blocked: false, visited: false },
+    { x: 0, y: 0, blocked: false, visited: true },
+    { x: -1, y: 0, blocked: false, visited: false },
   ],
   robot: { id: 1, x: 0, y: 0, orientation: 'L' },
   others: [{ id: 2, x: 1, y: 1, orientation: 'N' }],
@@ -35,8 +37,8 @@ describe('mapRows — RN12', () => {
     const kinds = mapRows(map).map((row) => row.map((cell) => cell.kind));
 
     expect(kinds).toEqual([
-      ['obstacle', 'free', 'other'],
-      ['unknown', 'self', 'unknown'],
+      ['obstacle', 'visited', 'other'],
+      ['seen', 'self', 'unknown'],
       ['unknown', 'unknown', 'unknown'],
     ]);
     expect(mapRows(map)[1]?.[1]).toMatchObject({
@@ -46,7 +48,7 @@ describe('mapRows — RN12', () => {
   });
 
   it('exploration conta as casas conhecidas', () => {
-    expect(exploration(map)).toEqual({ known: 4, total: 9 });
+    expect(exploration(map)).toEqual({ known: 5, total: 9 });
   });
 });
 
@@ -112,6 +114,16 @@ describe('describeEvent', () => {
     [
       event({ kind: 'shared', to: 2, added: 0 }),
       'enviou o mapa ao robô 2: 0 casas novas',
+      'info',
+    ],
+    [
+      event({ kind: 'forgot', forgotten: 1 }),
+      'apagou o mapa: esqueceu 1 casa',
+      'info',
+    ],
+    [
+      event({ kind: 'forgot', forgotten: 12 }),
+      'apagou o mapa: esqueceu 12 casas',
       'info',
     ],
     [
@@ -286,6 +298,7 @@ describe('ApiClient', () => {
 
   it.each([
     ['stopProgram', '/api/robots/3/stop', 'POST'],
+    ['forgetMap', '/api/robots/3/forget', 'POST'],
     ['pause', '/api/clock/pause', 'POST'],
     ['step', '/api/clock/step', 'POST'],
     ['setSpeed', '/api/clock/speed', 'PUT'],
@@ -295,9 +308,11 @@ describe('ApiClient', () => {
 
     await (method === 'stopProgram'
       ? client.stopProgram(3)
-      : method === 'setSpeed'
-        ? client.setSpeed(5)
-        : client[method]());
+      : method === 'forgetMap'
+        ? client.forgetMap(3)
+        : method === 'setSpeed'
+          ? client.setSpeed(5)
+          : client[method]());
 
     expect(calls[0]).toMatchObject({ path, init: { method: verb } });
   });

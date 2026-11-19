@@ -32,6 +32,8 @@ export type SimulationEvent = { tick: number; robot: number } & (
     }
   | { kind: 'shared'; to: number; added: number }
   | { kind: 'shareFailed'; to: number; reason: ShareFailure }
+  // RN20: quantas casas o robô deixou de conhecer
+  | { kind: 'forgot'; forgotten: number }
   | { kind: 'printed'; text: string }
   | { kind: 'finished' }
   | { kind: 'error'; message: string; line: number; column: number }
@@ -122,6 +124,12 @@ export class Simulation {
     return this.#running.delete(id);
   }
 
+  // RN20: o operador apaga o mapa do robô, fora dos ticks (não gasta tick nem
+  // mexe no programa). Devolve quantas casas ele deixou de conhecer.
+  forgetMap(id: number): number {
+    return this.fleet.robot(id).forgetMap();
+  }
+
   // RN17: avança 1 tick e devolve o que aconteceu. Sem programas, não faz nada.
   advance(): SimulationEvent[] {
     if (this.idle) {
@@ -187,6 +195,12 @@ export class Simulation {
         return true;
       case 'shareMap':
         return this.#share(id, action.to);
+      case 'forgetMap':
+        this.#emit(id, {
+          kind: 'forgot',
+          forgotten: this.fleet.robot(id).forgetMap(),
+        });
+        return true;
     }
   }
 

@@ -8,7 +8,12 @@ import {
 
 // Visão inicial em volta da origem, com um obstáculo visto em (1,1)
 const around: CellDTO[] = [-1, 0, 1].flatMap((x) =>
-  [-1, 0, 1].map((y) => ({ x, y, blocked: x === 1 && y === 1 })),
+  [-1, 0, 1].map((y) => ({
+    x,
+    y,
+    blocked: x === 1 && y === 1,
+    visited: x === 0 && y === 0,
+  })),
 );
 
 const base: MapDTO = {

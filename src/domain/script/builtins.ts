@@ -27,6 +27,8 @@ export const BUILTIN_NAMES = [
   'turnLeft',
   'wait',
   'shareMap',
+  'forgetMap',
+  'goTo',
   'stop',
   'front',
   'back',
@@ -51,6 +53,9 @@ export function cellRecord(cell: CellInfo): RecordValue {
   return record('cell', {
     type: cell.type,
     isEmpty: cell.type === 'empty',
+    isUnknown: cell.type === 'unknown',
+    visited: cell.visited,
+    unknownAround: cell.unknownAround,
     position: positionRecord(cell.x, cell.y),
     robot: cell.robot,
   });
@@ -89,8 +94,26 @@ export function builtinScope(host: RobotHost): Scope {
   action('turnRight', { kind: 'turnRight' });
   action('turnLeft', { kind: 'turnLeft' });
   action('wait', { kind: 'wait' });
+  action('forgetMap', { kind: 'forgetMap' });
   define('shareMap', 1, 1, function* ([to], location): Execution {
     return yield { kind: 'shareMap', to: integer(to ?? null, location) };
+  });
+  // RN21: um passo por tick pelo menor caminho; para no primeiro passo que falhar
+  define('goTo', 2, 2, function* ([x, y], location): Execution {
+    const path = host.pathTo(
+      integer(x ?? null, location),
+      integer(y ?? null, location),
+    );
+    if (path === null) {
+      return false;
+    }
+    for (const kind of path) {
+      const moved = yield { kind };
+      if (!moved) {
+        return false;
+      }
+    }
+    return true;
   });
   // eslint-disable-next-line require-yield -- encerra sem pedir ação
   define('stop', 0, 0, function* (): Execution {

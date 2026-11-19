@@ -85,7 +85,14 @@ describe('ScriptProcess — ações e ticks', () => {
         // depois do 3º passo aparece um obstáculo na frente
         answer: (_action, index) => {
           if (index === 2) {
-            host.cells.front = { type: 'obstacle', x: 0, y: 4, robot: null };
+            host.cells.front = {
+              type: 'obstacle',
+              x: 0,
+              y: 4,
+              robot: null,
+              visited: false,
+              unknownAround: 0,
+            };
           }
           return true;
         },
@@ -269,9 +276,30 @@ describe('ScriptProcess — sensores', () => {
   it('front, back, left e right devolvem casas com tipo, posição e robô', () => {
     const host = new FakeHost();
     host.cells = {
-      front: { type: 'robot', x: 0, y: 1, robot: 2 },
-      back: { type: 'edge', x: 0, y: -1, robot: null },
-      left: { type: 'obstacle', x: -1, y: 0, robot: null },
+      front: {
+        type: 'robot',
+        x: 0,
+        y: 1,
+        robot: 2,
+        visited: false,
+        unknownAround: 0,
+      },
+      back: {
+        type: 'edge',
+        x: 0,
+        y: -1,
+        robot: null,
+        visited: false,
+        unknownAround: 0,
+      },
+      left: {
+        type: 'obstacle',
+        x: -1,
+        y: 0,
+        robot: null,
+        visited: false,
+        unknownAround: 0,
+      },
     };
 
     const { host: after } = runScript(
@@ -309,8 +337,15 @@ describe('ScriptProcess — sensores', () => {
   it('see, cellAt e explored', () => {
     const host = new FakeHost();
     host.visible = [
-      { type: 'empty', x: 0, y: 0, robot: null },
-      { type: 'robot', x: 1, y: 1, robot: 3 },
+      {
+        type: 'empty',
+        x: 0,
+        y: 0,
+        robot: null,
+        visited: false,
+        unknownAround: 0,
+      },
+      { type: 'robot', x: 1, y: 1, robot: 3, visited: false, unknownAround: 0 },
     ];
 
     const { host: after } = runScript(
@@ -324,6 +359,30 @@ describe('ScriptProcess — sensores', () => {
     );
 
     expect(after.printed).toEqual(['robô 3 em (1, 1)', 'unknown 9']);
+  });
+
+  it('casa: isUnknown, visited e unknownAround — RN19', () => {
+    const host = new FakeHost();
+    host.cells = {
+      front: {
+        type: 'empty',
+        x: 0,
+        y: 1,
+        robot: null,
+        visited: true,
+        unknownAround: 3,
+      },
+    };
+
+    const { host: after } = runScript(
+      `
+      print(front().isUnknown, front().visited, front().unknownAround)
+      print(cellAt(5, 5).isUnknown, cellAt(5, 5).isEmpty)
+    `,
+      { host },
+    );
+
+    expect(after.printed).toEqual(['false true 3', 'true false']);
   });
 
   it('type() dos outros valores e funções matemáticas', () => {
@@ -405,5 +464,47 @@ describe('ScriptProcess — erros de execução', () => {
 
     expect(process.next().kind).toBe('error');
     expect(process.next()).toEqual({ kind: 'finished' });
+  });
+});
+
+describe('ScriptProcess — goTo — RN21', () => {
+  it('pede o caminho ao robô e dá um passo por tick; devolve true ao chegar', () => {
+    const host = new FakeHost();
+    host.path = ['forward', 'stepRight', 'forward'];
+
+    const { actions, host: after } = runScript('print(goTo(2, 5))', { host });
+
+    expect(after.pathRequests).toEqual([[2, 5]]);
+    expect(kinds(actions)).toEqual(['forward', 'stepRight', 'forward']);
+    expect(after.printed).toEqual(['true']);
+  });
+
+  it('para no primeiro passo que falhar e devolve false', () => {
+    const host = new FakeHost();
+    host.path = ['forward', 'forward', 'forward'];
+
+    const { actions, host: after } = runScript('print(goTo(0, 3))', {
+      host,
+      answer: (_, index) => index === 0,
+    });
+
+    expect(kinds(actions)).toEqual(['forward', 'forward']);
+    expect(after.printed).toEqual(['false']);
+  });
+
+  it('sem caminho conhecido devolve false sem gastar tick; já no destino, true', () => {
+    const host = new FakeHost();
+    host.path = null;
+    const blocked = runScript('print(goTo(1, 1))', { host });
+    const here = runScript('print(goTo(0, 0))');
+
+    expect(blocked.actions).toEqual([]);
+    expect(blocked.host.printed).toEqual(['false']);
+    expect(here.actions).toEqual([]);
+    expect(here.host.printed).toEqual(['true']);
+  });
+
+  it('as coordenadas precisam ser inteiras', () => {
+    expect(runtimeError('goTo(1.5, 2)').reason).toContain('inteiro');
   });
 });
