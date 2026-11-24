@@ -217,9 +217,7 @@ describe('World — criação e snapshot', () => {
     w.upgradeWarehouse();
 
     const restored = World.restore(
-      JSON.parse(JSON.stringify(w.snapshot())) as ReturnType<
-        World['snapshot']
-      >,
+      JSON.parse(JSON.stringify(w.snapshot())) as ReturnType<World['snapshot']>,
       seededRandom(1),
     );
 

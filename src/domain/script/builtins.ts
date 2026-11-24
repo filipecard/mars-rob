@@ -185,7 +185,10 @@ export function builtinScope(host: RobotHost): Scope {
   action('unload', { kind: 'unload' });
   action('mine', { kind: 'mine' });
   define('upgrade', 1, 1, function* ([kind], location): Execution {
-    return yield { kind: 'upgrade', upgrade: upgradeKind(kind ?? null, location) };
+    return yield {
+      kind: 'upgrade',
+      upgrade: upgradeKind(kind ?? null, location),
+    };
   });
   // eslint-disable-next-line require-yield -- encerra sem pedir ação
   define('stop', 0, 0, function* (): Execution {

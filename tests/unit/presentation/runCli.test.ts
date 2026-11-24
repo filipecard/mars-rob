@@ -78,6 +78,33 @@ const LEGEND = [
 ].join('\n');
 
 describe('runCli — ordens', () => {
+  it('lista, salva, carrega e valida melhorias e estado pela CLI', async () => {
+    const output = await run([
+      'salvos',
+      'salvar',
+      'salvar bad/name',
+      'salvar mars-1',
+      'salvos',
+      'carregar missing',
+      'carregar mars-1',
+      'estado 9',
+      'melhorar',
+      'melhorar 1 laser',
+      'melhorar 1 picareta',
+    ]);
+    expect(output[0]).toContain('Nenhuma simulação salva');
+    expect(output[1]).toContain('Use "salvar NOME"');
+    expect(output[2]).toContain('Nome inválido');
+    expect(output[3]).toContain('Simulação salva');
+    expect(output[4]).toContain('mars-1');
+    expect(output[5]).toContain('Não existe simulação salva');
+    expect(output[6]).toContain('carregada');
+    expect(output[7]).toContain('Não existe robô');
+    expect(output[8]).toContain('Use "melhorar ID');
+    expect(output[9]).toContain('Melhoria desconhecida');
+    expect(output[10]).toContain('faltam 3 galhos');
+  });
+
   it('imprime a posição após cada ordem válida', async () => {
     expect(await run(['1:N', '1:LL'])).toEqual([
       'Robô 1: posição atual (X: 0, Y: 1) para o Norte',

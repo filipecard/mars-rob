@@ -96,7 +96,9 @@ export class Inventory {
   // Devolve quantos itens passaram.
   transferTo(other: Inventory): number {
     let moved = 0;
-    const bySize = [...ITEM_KINDS].sort((a, b) => ITEM_SIZES[b] - ITEM_SIZES[a]);
+    const bySize = [...ITEM_KINDS].sort(
+      (a, b) => ITEM_SIZES[b] - ITEM_SIZES[a],
+    );
     for (const kind of bySize) {
       while (this.#counts[kind] > 0 && other.add(kind)) {
         this.#counts[kind]--;

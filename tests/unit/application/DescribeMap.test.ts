@@ -57,7 +57,8 @@ describe('DescribeMap', () => {
         // RN19: só a origem e (1,0) foram pisadas
         visited: y === 0 && (x === 0 || x === 1),
         // RN23: a base fica na origem
-        ground: x === 2 && y === 1 ? 'rock' : x === 0 && y === 0 ? 'base' : 'free',
+        ground:
+          x === 2 && y === 1 ? 'rock' : x === 0 && y === 0 ? 'base' : 'free',
         item: null,
       })),
     );

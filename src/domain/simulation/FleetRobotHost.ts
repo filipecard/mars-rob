@@ -106,8 +106,7 @@ export class FleetRobotHost implements RobotHost {
       y,
       robot: other,
       visited: robot.hasVisited(position),
-      unknownAround:
-        type === 'edge' ? 0 : this.#unknownAround(position),
+      unknownAround: type === 'edge' ? 0 : this.#unknownAround(position),
       item: seen?.item ?? null,
       obstacle:
         seen !== null && isBlockingGround(seen.ground)
@@ -191,10 +190,13 @@ export class FleetRobotHost implements RobotHost {
   // RN25: a casa mais próxima onde o robô lembra de ter visto um item
   nearestItem(kind: ItemKind | null): CellInfo | null {
     const robot = this.#robot;
-    const found = this.#search((cell) => {
-      const item = robot.memoryOf(cell)?.item ?? null;
-      return item !== null && (kind === null || item === kind);
-    }, () => false);
+    const found = this.#search(
+      (cell) => {
+        const item = robot.memoryOf(cell)?.item ?? null;
+        return item !== null && (kind === null || item === kind);
+      },
+      () => false,
+    );
     return found === null ? null : this.cellAt(found.cell.x, found.cell.y);
   }
 
@@ -207,7 +209,8 @@ export class FleetRobotHost implements RobotHost {
       (cell) => sideNeighbors(cell).some(isOre),
       () => false,
     );
-    const ore = found === null ? undefined : sideNeighbors(found.cell).find(isOre);
+    const ore =
+      found === null ? undefined : sideNeighbors(found.cell).find(isOre);
     return ore === undefined ? null : this.cellAt(ore.x, ore.y);
   }
 

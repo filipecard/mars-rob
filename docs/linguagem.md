@@ -96,19 +96,26 @@ print(a); // Andarilho { limite: 10, passos: 10 }
 
 Cada ação devolve `true` se deu certo e `false` se não deu (ex.: andar contra um obstáculo).
 
-| Ação           | Efeito                                                |
-| -------------- | ----------------------------------------------------- |
-| `forward()`    | um passo para a frente                                |
-| `backward()`   | um passo para trás                                    |
-| `stepRight()`  | um passo para a direita (sem girar)                   |
-| `stepLeft()`   | um passo para a esquerda (sem girar)                  |
-| `turnRight()`  | gira 90° para a direita                               |
-| `turnLeft()`   | gira 90° para a esquerda                              |
-| `wait()`       | fica parado um tick                                   |
-| `shareMap(id)` | envia o mapa para o robô `id` (precisa estar ao lado) |
-| `forgetMap()`  | apaga o mapa do robô (ver abaixo)                     |
-| `goTo(x, y)`   | vai até (x, y), 1 passo por tick (ver abaixo)         |
-| `stop()`       | encerra o programa (não gasta tick)                   |
+| Ação             | Efeito                                                |
+| ---------------- | ----------------------------------------------------- |
+| `forward()`      | um passo para a frente                                |
+| `backward()`     | um passo para trás                                    |
+| `stepRight()`    | um passo para a direita (sem girar)                   |
+| `stepLeft()`     | um passo para a esquerda (sem girar)                  |
+| `turnRight()`    | gira 90° para a direita                               |
+| `turnLeft()`     | gira 90° para a esquerda                              |
+| `wait()`         | fica parado um tick                                   |
+| `shareMap(id)`   | envia o mapa para o robô `id` (precisa estar ao lado) |
+| `forgetMap()`    | apaga o mapa do robô (ver abaixo)                     |
+| `goTo(x, y)`     | vai até (x, y), 1 passo por tick (ver abaixo)         |
+| `goNextTo(x, y)` | vai até uma casa ao lado de (x, y)                    |
+| `face(x, y)`     | gira para olhar para a casa adjacente (x, y)          |
+| `recharge()`     | recarrega na base                                     |
+| `collect()`      | pega o item da casa onde o robô está                  |
+| `unload()`       | descarrega itens no armazém da base                   |
+| `mine()`         | minera a jazida à frente (exige picareta)             |
+| `upgrade(tipo)`  | compra uma melhoria na base                           |
+| `stop()`         | encerra o programa (não gasta tick)                   |
 
 `goTo(x, y)` leva o robô até a casa (x, y) pelo menor caminho no mapa dele, um passo por tick e
 sem girar (anda de frente, de costas ou de lado). Ele só anda por casas que já conhece: contorna os
@@ -135,6 +142,14 @@ lugar, volta a conhecer a própria casa (como visitada) e o 3x3 em volta, igual 
 | `cellAt(x, y)`                           | a casa no mapa do robô (`"unknown"` se ele ainda não viu)                                                  |
 | `explored()`                             | quantas casas o robô já conhece                                                                            |
 | `nearestUnknown()`                       | a casa conhecida e livre mais próxima (em passos) de onde ele vê algo desconhecido, ou `null` (ver abaixo) |
+| `nearestItem(tipo?)`                     | item conhecido e alcançável mais próximo; tipo é opcional (`branch`, `stone`, `log` ou `iron`)             |
+| `nearestOre()`                           | jazida conhecida e alcançável mais próxima                                                                 |
+| `battery()`, `maxBattery()`              | carga atual e capacidade da bateria                                                                        |
+| `cargo()`, `maxCargo()`                  | espaço ocupado e capacidade do compartimento do robô                                                       |
+| `inventory()`                            | lista dos itens no compartimento do robô                                                                   |
+| `base()`                                 | posição da base (`.x`, `.y`)                                                                               |
+| `warehouse()`                            | armazém da base: campos de itens, `used` e `capacity`                                                      |
+| `canUpgrade(tipo)`, `level(tipo)`        | se uma melhoria pode ser comprada e o nível atual                                                          |
 | `self`                                   | o próprio robô: `self.id`, `self.position`, `self.orientation` (`"north"`, `"east"`, `"south"`, `"west"`)  |
 
 Uma **casa** tem:
@@ -148,6 +163,9 @@ Uma **casa** tem:
 | `unknownAround` | quantas casas desconhecidas há no 3x3 dela (0 a 9): o que o robô descobriria parando ali |
 | `position`      | a posição (`.x`, `.y`)                                                                   |
 | `robot`         | o ID do robô que está nela, ou `null`                                                    |
+| `item`          | item no chão: `branch`, `stone`, `log` ou `iron`; `null` se não há                       |
+| `obstacle`      | obstáculo: `rock`, `tree` ou `ore`; `null` se não há                                     |
+| `isBase`        | `true` se a casa contém a base                                                           |
 
 As casas vizinhas (`front()` etc.) estão sempre na visão, então nunca são `"unknown"`. Para
 explorar, olhe o `unknownAround` delas, ou use `cellAt(x, y)` para casas mais longe:

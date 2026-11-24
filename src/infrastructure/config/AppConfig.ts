@@ -136,7 +136,14 @@ export function parseConfig(raw: unknown): ConfigResult {
 
   return {
     ok: true,
-    config: { limit, robots, obstacles: { count, maxSize }, seed, robot, world },
+    config: {
+      limit,
+      robots,
+      obstacles: { count, maxSize },
+      seed,
+      robot,
+      world,
+    },
   };
 }
 

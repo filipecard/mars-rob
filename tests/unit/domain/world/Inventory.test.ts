@@ -44,7 +44,12 @@ describe('Inventory — RN25', () => {
 
     // cabem 2 troncos (8) e 1 galho (1)
     expect(cargo.transferTo(warehouse)).toBe(3);
-    expect(warehouse.counts()).toEqual({ branch: 1, stone: 0, log: 2, iron: 0 });
+    expect(warehouse.counts()).toEqual({
+      branch: 1,
+      stone: 0,
+      log: 2,
+      iron: 0,
+    });
     expect(cargo.counts()).toEqual({ branch: 1, stone: 0, log: 0, iron: 0 });
   });
 

@@ -1,10 +1,6 @@
 import { UnknownRobotError } from '../../domain/errors/UnknownRobotError.js';
 import { isUpgradeKind } from '../../domain/world/Upgrade.js';
-import type {
-  ItemCountsDTO,
-  UpgradeDTO,
-  UpgradeFailureDTO,
-} from '../dto.js';
+import type { ItemCountsDTO, UpgradeDTO, UpgradeFailureDTO } from '../dto.js';
 import type { SimulationRepository } from '../ports/SimulationRepository.js';
 
 export type UpgradeResult =

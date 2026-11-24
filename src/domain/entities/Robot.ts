@@ -64,7 +64,12 @@ export interface RobotSnapshot {
   solar: number;
   cargo: ItemCounts;
   levels: RobotLevels;
-  explored: { x: number; y: number; ground: Ground; item: CellSnapshot['item'] }[];
+  explored: {
+    x: number;
+    y: number;
+    ground: Ground;
+    item: CellSnapshot['item'];
+  }[];
   visited: [number, number][];
 }
 
@@ -84,7 +89,12 @@ export class Robot {
   #spent = false;
   // RN25
   readonly cargo: Inventory;
-  readonly #levels: RobotLevels = { pickaxe: 0, battery: 0, cargo: 0, vision: 0 };
+  readonly #levels: RobotLevels = {
+    pickaxe: 0,
+    battery: 0,
+    cargo: 0,
+    vision: 0,
+  };
 
   private constructor(
     terrain: Terrain,

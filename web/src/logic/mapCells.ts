@@ -11,6 +11,9 @@ export interface MapCell {
   // ID do robô na casa (só em 'self' e 'other')
   robotId: number | null;
   orientation: OrientationDTO | null;
+  item: string | null;
+  ground: string;
+  isBase: boolean;
 }
 
 const key = (x: number, y: number): string => `${String(x)},${String(y)}`;
@@ -38,6 +41,9 @@ export function mapRows(map: MapDTO): MapCell[][] {
         kind: 'self',
         robotId: robot.id,
         orientation: robot.orientation,
+        item: null,
+        ground: 'free',
+        isBase: x === map.base.x && y === map.base.y,
       };
     }
     const other = others.get(key(x, y));
@@ -48,6 +54,9 @@ export function mapRows(map: MapDTO): MapCell[][] {
         kind: 'other',
         robotId: other.id,
         orientation: other.orientation,
+        item: null,
+        ground: 'free',
+        isBase: x === map.base.x && y === map.base.y,
       };
     }
     const cell = known.get(key(x, y));
@@ -59,7 +68,16 @@ export function mapRows(map: MapDTO): MapCell[][] {
           : cell.visited
             ? 'visited'
             : 'seen';
-    return { x, y, kind, robotId: null, orientation: null };
+    return {
+      x,
+      y,
+      kind,
+      robotId: null,
+      orientation: null,
+      item: cell?.item ?? null,
+      ground: cell?.ground ?? 'free',
+      isBase: x === map.base.x && y === map.base.y,
+    };
   }
 }
 

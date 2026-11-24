@@ -27,7 +27,8 @@ export type OrientationDTO = 'N' | 'L' | 'S' | 'O';
 export type ItemDTO = 'branch' | 'stone' | 'log' | 'iron';
 
 // RN28: picareta, bateria, compartimento, visão e armazém
-export type UpgradeDTO = 'pickaxe' | 'battery' | 'cargo' | 'vision' | 'warehouse';
+export type UpgradeDTO =
+  'pickaxe' | 'battery' | 'cargo' | 'vision' | 'warehouse';
 
 export type GroundDTO = 'free' | 'base' | 'rock' | 'tree' | 'ore';
 
@@ -130,7 +131,9 @@ export function toMapDTO(fleet: Fleet, id: number): MapDTO {
     explored: robot.memory().map(({ position, seen }) => ({
       ...toPositionDTO(position),
       blocked:
-        seen.ground === 'rock' || seen.ground === 'tree' || seen.ground === 'ore',
+        seen.ground === 'rock' ||
+        seen.ground === 'tree' ||
+        seen.ground === 'ore',
       visited: robot.hasVisited(position),
       ground: seen.ground,
       item: seen.item,

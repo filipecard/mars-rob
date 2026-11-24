@@ -48,8 +48,7 @@ export interface ApiResponse {
 
 type Listener = (update: UpdateMessage) => void;
 
-const ROBOT_ROUTE =
-  /^\/api\/robots\/([1-9]\d*)\/(script|stop|forget|upgrade)$/;
+const ROBOT_ROUTE = /^\/api\/robots\/([1-9]\d*)\/(script|stop|forget|upgrade)$/;
 
 const error = (status: number, message: string): ApiResponse => ({
   status,

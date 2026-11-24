@@ -1,17 +1,11 @@
 import { useEffect, useState } from 'react';
-import {
-  appendEvents,
-  lastErrors,
-  type EventLine,
-  type ScriptErrorInfo,
-} from '../logic/events.js';
+import { lastErrors, type ScriptErrorInfo } from '../logic/events.js';
 import type { UpdateMessage } from './types.js';
 
 export type Connection = 'connecting' | 'open' | 'closed';
 
 export interface SimulationView {
   update: UpdateMessage | null;
-  log: EventLine[];
   // Último erro de execução de cada robô (some ao rodar outro script)
   errors: ReadonlyMap<number, ScriptErrorInfo>;
   connection: Connection;
@@ -23,7 +17,6 @@ const RETRY_MS = 1500;
 // Recebe o estado e os eventos pelo WebSocket; reconecta se a conexão cair
 export function useSimulation(): SimulationView {
   const [update, setUpdate] = useState<UpdateMessage | null>(null);
-  const [log, setLog] = useState<EventLine[]>([]);
   const [errors, setErrors] = useState<ReadonlyMap<number, ScriptErrorInfo>>(
     () => new Map(),
   );
@@ -47,7 +40,6 @@ export function useSimulation(): SimulationView {
         if (data.events.length === 0) {
           return;
         }
-        setLog((current) => appendEvents(current, data.events));
         const found = lastErrors(data.events);
         if (found.size > 0) {
           setErrors((current) => new Map([...current, ...found]));
@@ -79,5 +71,5 @@ export function useSimulation(): SimulationView {
     });
   };
 
-  return { update, log, errors, connection, clearError };
+  return { update, errors, connection, clearError };
 }

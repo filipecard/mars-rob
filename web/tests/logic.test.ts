@@ -22,14 +22,30 @@ const map: MapDTO = {
   min: -1,
   max: 1,
   explored: [
-    { x: -1, y: 1, blocked: true, visited: false },
-    { x: 0, y: 1, blocked: false, visited: true },
-    { x: 1, y: 1, blocked: false, visited: false },
-    { x: 0, y: 0, blocked: false, visited: true },
-    { x: -1, y: 0, blocked: false, visited: false },
+    { x: -1, y: 1, blocked: true, visited: false, ground: 'rock', item: null },
+    {
+      x: 0,
+      y: 1,
+      blocked: false,
+      visited: true,
+      ground: 'free',
+      item: 'branch',
+    },
+    {
+      x: 1,
+      y: 1,
+      blocked: false,
+      visited: false,
+      ground: 'free',
+      item: 'stone',
+    },
+    { x: 0, y: 0, blocked: false, visited: true, ground: 'base', item: null },
+    { x: -1, y: 0, blocked: false, visited: false, ground: 'free', item: null },
   ],
   robot: { id: 1, x: 0, y: 0, orientation: 'L' },
   others: [{ id: 2, x: 1, y: 1, orientation: 'N' }],
+  base: { x: 0, y: 0 },
+  visionRange: 1,
 };
 
 describe('mapRows — RN12', () => {
@@ -44,6 +60,11 @@ describe('mapRows — RN12', () => {
     expect(mapRows(map)[1]?.[1]).toMatchObject({
       robotId: 1,
       orientation: 'L',
+      isBase: true,
+    });
+    expect(mapRows(map)[0]?.[1]).toMatchObject({
+      item: 'branch',
+      ground: 'free',
     });
   });
 
@@ -76,6 +97,31 @@ describe('describeEvent', () => {
       'quiet',
     ],
     [event({ kind: 'waited' }), 'esperou', 'quiet'],
+    [
+      event({ kind: 'recharged', added: 20, battery: 80 }),
+      'recarregou 20; bateria 80',
+      'info',
+    ],
+    [
+      event({ kind: 'collected', item: 'iron' }),
+      'coletou minério de ferro',
+      'info',
+    ],
+    [
+      event({ kind: 'unloaded', count: 3 }),
+      'descarregou 3 itens na base',
+      'info',
+    ],
+    [
+      event({ kind: 'upgraded', upgrade: 'pickaxe', level: 1 }),
+      'melhoria picareta no nível 1',
+      'info',
+    ],
+    [
+      event({ kind: 'failed', action: 'collect', reason: 'full' }),
+      'coleta falhou: armazenamento cheio',
+      'warn',
+    ],
     [
       event({
         kind: 'blocked',

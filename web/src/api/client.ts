@@ -4,6 +4,9 @@ import type {
   LoadScriptResult,
   OrderResult,
   StopProgramResult,
+  SaveResult,
+  LoadResult,
+  UpgradeResult,
 } from './types.js';
 
 export type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
@@ -34,6 +37,24 @@ export class ApiClient {
   // RN20
   forgetMap(robotId: number): Promise<ForgetMapResult> {
     return this.#request('POST', `/api/robots/${String(robotId)}/forget`);
+  }
+
+  upgradeRobot(robotId: number, upgrade: string): Promise<UpgradeResult> {
+    return this.#request('POST', `/api/robots/${String(robotId)}/upgrade`, {
+      upgrade,
+    });
+  }
+
+  listSaves(): Promise<string[]> {
+    return this.#request('GET', '/api/saves');
+  }
+
+  saveGame(name: string): Promise<SaveResult> {
+    return this.#request('POST', '/api/save', { name });
+  }
+
+  loadGame(name: string): Promise<LoadResult> {
+    return this.#request('POST', '/api/load', { name });
   }
 
   play(): Promise<ClockDTO> {

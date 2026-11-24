@@ -24,6 +24,12 @@ export function RobotPanel({ robot, api, runtimeError, onClearError }: Props) {
     loadSavedScript(localStorage, robot.id),
   );
   const [syntaxError, setSyntaxError] = useState<ScriptErrorInfo | null>(null);
+  const [insertRequest, setInsertRequest] = useState<{
+    text: string;
+    id: number;
+  } | null>(null);
+  const [insertId, setInsertId] = useState(0);
+  const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
   const { map } = robot;
   const { known, total } = exploration(map);
   const error = syntaxError ?? runtimeError;
@@ -56,44 +62,159 @@ export function RobotPanel({ robot, api, runtimeError, onClearError }: Props) {
           {robot.program === null ? 'Parado' : PROGRAM_LABELS[robot.program]}
         </p>
       </header>
-      <MapGrid map={map} />
-      <div className="robot-map-row">
-        <p className="robot-facts">
-          Em ({map.robot.x}, {map.robot.y}), olhando para o{' '}
-          {ORIENTATION_NAMES[map.robot.orientation]}. Conhece {known} de {total}{' '}
-          casas.
-        </p>
-        <ForgetMapButton onConfirm={() => void api.forgetMap(robot.id)} />
-      </div>
-      <label className="editor-label" htmlFor={editorId}>
-        Script
-      </label>
-      <ScriptEditor
-        id={editorId}
-        value={source}
-        onChange={change}
-        errorLine={error?.line ?? null}
-      />
-      {error !== null && (
-        <p className="script-error" role="alert">
-          {syntaxError === null ? 'Parou com erro na' : 'Erro de sintaxe na'}{' '}
-          linha {error.line}, coluna {error.column}: {error.message}
-        </p>
-      )}
-      <div className="robot-actions">
-        <button type="button" className="primary" onClick={() => void run()}>
-          Rodar script
-        </button>
-        <button
-          type="button"
-          disabled={robot.program === null}
-          onClick={() => void api.stopProgram(robot.id)}
-        >
-          Parar
-        </button>
+      <div className="robot-workbench">
+        <section className="robot-map-panel" aria-label="Mapa e recursos">
+          <MapGrid
+            map={map}
+            onCellClick={(x, y) => {
+              setSelectedPosition(`(${String(x)}, ${String(y)})`);
+              const id = insertId + 1;
+              setInsertId(id);
+              setInsertRequest({ text: `${String(x)}, ${String(y)}`, id });
+            }}
+          />
+          {selectedPosition !== null && (
+            <p className="robot-facts">
+              Posição selecionada: {selectedPosition} · coordenadas inseridas no
+              cursor do script.
+            </p>
+          )}
+          <div className="robot-map-row">
+            <p className="robot-facts">
+              Em ({map.robot.x}, {map.robot.y}), olhando para o{' '}
+              {ORIENTATION_NAMES[map.robot.orientation]}. Conhece {known} de{' '}
+              {total} casas.
+            </p>
+            <ForgetMapButton
+              onConfirm={() => {
+                void api.forgetMap(robot.id);
+              }}
+            />
+          </div>
+          <section
+            className="robot-resources"
+            aria-label={`Recursos do robô ${String(robot.id)}`}
+          >
+            <p>
+              Bateria: {robot.battery}/{robot.maxBattery}
+            </p>
+            <p>
+              Compartimento: {robot.cargo.used}/{robot.cargo.capacity} espaços ·{' '}
+              {formatItems(robot.cargo.items)}
+            </p>
+            <UpgradePanel robot={robot} api={api} />
+          </section>
+        </section>
+        <section className="robot-script-panel" aria-label="Editor do script">
+          <div className="script-toolbar">
+            <label className="editor-label" htmlFor={editorId}>
+              Script
+            </label>
+            <div className="robot-actions">
+              <button
+                type="button"
+                className="primary"
+                onClick={() => void run()}
+              >
+                Rodar script
+              </button>
+              <button
+                type="button"
+                disabled={robot.program === null}
+                onClick={() => void api.stopProgram(robot.id)}
+              >
+                Parar
+              </button>
+            </div>
+          </div>
+          <ScriptEditor
+            id={editorId}
+            value={source}
+            onChange={change}
+            errorLine={error?.line ?? null}
+            insertRequest={insertRequest}
+          />
+          {error !== null && (
+            <p className="script-error" role="alert">
+              {syntaxError === null
+                ? 'Parou com erro na'
+                : 'Erro de sintaxe na'}{' '}
+              linha {error.line}, coluna {error.column}: {error.message}
+            </p>
+          )}
+        </section>
       </div>
     </article>
   );
+}
+
+const UPGRADE_NAMES: Record<string, string> = {
+  pickaxe: 'Picareta',
+  battery: 'Bateria +50',
+  cargo: 'Compartimento +5',
+  vision: 'Visão 5×5',
+  warehouse: 'Armazém +50',
+};
+
+function UpgradePanel({
+  robot,
+  api,
+}: {
+  robot: RobotStatusDTO;
+  api: ApiClient;
+}) {
+  const [message, setMessage] = useState('');
+  return (
+    <div className="upgrade-panel">
+      <strong>
+        Melhorias {robot.atBase ? '(na base)' : '(disponíveis na base)'}
+      </strong>
+      <ul>
+        {robot.upgrades.map((offer) => (
+          <li key={offer.upgrade}>
+            <span>
+              {UPGRADE_NAMES[offer.upgrade] ?? offer.upgrade} · nível{' '}
+              {offer.level}/{offer.maxLevel}
+            </span>
+            {offer.cost !== null && (
+              <small> Custo: {formatItems(offer.cost)}</small>
+            )}
+            <button
+              type="button"
+              disabled={!offer.available}
+              onClick={() => {
+                void api
+                  .upgradeRobot(robot.id, offer.upgrade)
+                  .then((result) => {
+                    setMessage(
+                      result.ok
+                        ? 'Melhoria comprada.'
+                        : 'Não foi possível comprar a melhoria.',
+                    );
+                  });
+              }}
+            >
+              Comprar
+            </button>
+          </li>
+        ))}
+      </ul>
+      {message !== '' && <span role="status">{message}</span>}
+    </div>
+  );
+}
+
+function formatItems(items: Record<string, number>): string {
+  const names: Record<string, string> = {
+    branch: 'galhos',
+    stone: 'pedras',
+    log: 'troncos',
+    iron: 'ferros',
+  };
+  const list = Object.entries(items)
+    .filter(([, count]) => count > 0)
+    .map(([kind, count]) => `${String(count)} ${names[kind] ?? kind}`);
+  return list.length === 0 ? 'vazio' : list.join(', ');
 }
 
 // RN20: apagar o mapa pede confirmação no próprio botão (sem janela do navegador).

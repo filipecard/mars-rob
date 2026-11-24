@@ -1,9 +1,5 @@
 import { Fleet } from '../entities/Fleet.js';
-import type {
-  Robot,
-  RobotSettings,
-  RobotSnapshot,
-} from '../entities/Robot.js';
+import type { Robot, RobotSettings, RobotSnapshot } from '../entities/Robot.js';
 import { CollisionError } from '../errors/CollisionError.js';
 import { NotAdjacentError } from '../errors/NotAdjacentError.js';
 import { ObstacleError } from '../errors/ObstacleError.js';
@@ -150,11 +146,7 @@ export class Simulation {
   // RN30: volta ao estado salvo. Scripts com erro de sintaxe ficam de fora.
   static restore(snapshot: SimulationSnapshot, random: Random): Simulation {
     const world = World.restore(snapshot.world, random);
-    const fleet = Fleet.restore(
-      world,
-      snapshot.robots,
-      snapshot.robotSettings,
-    );
+    const fleet = Fleet.restore(world, snapshot.robots, snapshot.robotSettings);
     const simulation = new Simulation(fleet, { seed: snapshot.seed });
     simulation.#tick = snapshot.tick;
     for (const { robot, source } of snapshot.scripts) {
@@ -284,7 +276,9 @@ export class Simulation {
       }
     }
     // RN26, RN27: o mundo anda; nada cresce em cima de um robô
-    this.world.advance((position) => this.fleet.robotAt(position) !== undefined);
+    this.world.advance(
+      (position) => this.fleet.robotAt(position) !== undefined,
+    );
     for (const robot of this.fleet.robots) {
       robot.endTick();
       robot.refreshView();

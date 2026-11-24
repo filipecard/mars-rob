@@ -1,6 +1,6 @@
 # Plano — mundo vivo, base, bateria, coleta e melhorias
 
-Estado: decisões fechadas em 2026-11-24; fases A e B feitas; próxima: C. Os números abaixo são **propostas** e vão para o arquivo de
+Estado: decisões fechadas em 2026-11-24; fases A–F feitas; `npm run check` passou. Os números abaixo são **propostas** e vão para o arquivo de
 configuração, para ajustar sem mexer no código.
 
 Decisões já tomadas:

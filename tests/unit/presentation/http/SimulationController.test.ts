@@ -3,6 +3,82 @@ import type { Timers } from '../../../../src/presentation/http/Clock.js';
 import { collect, controller } from './httpFixture.js';
 
 describe('SimulationController — rotas', () => {
+  it('lista, salva e carrega simulações pela API', async () => {
+    const api = controller();
+    expect(
+      await api.handle({ method: 'GET', path: '/api/saves', body: undefined }),
+    ).toEqual({ status: 200, body: [] });
+    expect(
+      await api.handle({ method: 'POST', path: '/api/save', body: {} }),
+    ).toMatchObject({ status: 400 });
+    expect(
+      await api.handle({
+        method: 'POST',
+        path: '/api/save',
+        body: { name: 'bad/name' },
+      }),
+    ).toMatchObject({ status: 400, body: { error: 'INVALID_NAME' } });
+    expect(
+      await api.handle({
+        method: 'POST',
+        path: '/api/save',
+        body: { name: 'mars-1' },
+      }),
+    ).toMatchObject({ status: 200, body: { ok: true } });
+    expect(
+      await api.handle({ method: 'GET', path: '/api/saves', body: undefined }),
+    ).toEqual({ status: 200, body: ['mars-1'] });
+    expect(
+      await api.handle({ method: 'POST', path: '/api/load', body: {} }),
+    ).toMatchObject({ status: 400 });
+    expect(
+      await api.handle({
+        method: 'POST',
+        path: '/api/load',
+        body: { name: 'missing' },
+      }),
+    ).toMatchObject({ status: 404, body: { error: 'NOT_FOUND' } });
+    expect(
+      await api.handle({
+        method: 'POST',
+        path: '/api/load',
+        body: { name: 'mars-1' },
+      }),
+    ).toMatchObject({ status: 200, body: { ok: true } });
+  });
+
+  it('valida os pedidos de melhoria do operador', async () => {
+    const api = controller();
+    expect(
+      await api.handle({
+        method: 'POST',
+        path: '/api/robots/1/upgrade',
+        body: {},
+      }),
+    ).toMatchObject({ status: 400 });
+    expect(
+      await api.handle({
+        method: 'POST',
+        path: '/api/robots/1/upgrade',
+        body: { upgrade: 'laser' },
+      }),
+    ).toMatchObject({ status: 400, body: { error: 'UNKNOWN_UPGRADE' } });
+    expect(
+      await api.handle({
+        method: 'POST',
+        path: '/api/robots/9/upgrade',
+        body: { upgrade: 'battery' },
+      }),
+    ).toMatchObject({ status: 404, body: { error: 'UNKNOWN_ROBOT' } });
+    expect(
+      await api.handle({
+        method: 'POST',
+        path: '/api/robots/1/upgrade',
+        body: { upgrade: 'battery' },
+      }),
+    ).toMatchObject({ status: 400, body: { error: 'UPGRADE_FAILED' } });
+  });
+
   it('GET /api/state devolve o estado e o relógio', async () => {
     const response = await controller().handle({
       method: 'GET',

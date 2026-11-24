@@ -22,6 +22,7 @@ interface Props {
   onChange: (value: string) => void;
   // Linha com erro, destacada na margem
   errorLine: number | null;
+  insertRequest?: { text: string; id: number } | null;
 }
 
 const MAX_SHOWN = 8;
@@ -29,7 +30,13 @@ const MAX_SHOWN = 8;
 // Textarea com números de linha e autocomplete.
 // Sugestões: aparecem ao digitar um nome ou um ponto; Ctrl+Espaço abre na hora.
 // ↑/↓ escolhem, Enter ou Tab aceitam, Esc fecha. Tab sem sugestão indenta.
-export function ScriptEditor({ id, value, onChange, errorLine }: Props) {
+export function ScriptEditor({
+  id,
+  value,
+  onChange,
+  errorLine,
+  insertRequest = null,
+}: Props) {
   const gutter = useRef<HTMLDivElement>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const listId = useId();
@@ -61,6 +68,18 @@ export function ScriptEditor({ id, value, onChange, errorLine }: Props) {
       }
     });
   };
+
+  useEffect(() => {
+    if (insertRequest === null || area.current === null) return;
+    const element = area.current;
+    const start = element.selectionStart;
+    const end = element.selectionEnd;
+    const source =
+      value.slice(0, start) + insertRequest.text + value.slice(end);
+    place({ source, cursor: start + insertRequest.text.length });
+    element.focus();
+    setOpen(false);
+  }, [insertRequest]);
 
   const accept = (suggestion: Suggestion): void => {
     if (context === null) {

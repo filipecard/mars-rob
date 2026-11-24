@@ -147,6 +147,70 @@ describe('ScriptProcess — ações e ticks', () => {
   });
 });
 
+describe('ScriptProcess — mundo vivo e recursos', () => {
+  it('expõe bateria, armazenamento, posição da base, melhorias e busca de itens', () => {
+    const host = new FakeHost();
+    host.itemFound = { ...host.look('front'), item: 'stone' };
+    host.oreFound = {
+      ...host.look('front'),
+      type: 'obstacle',
+      obstacle: 'ore',
+    };
+    const { last } = runScript(
+      'print(battery(), maxBattery(), cargo(), maxCargo(), inventory(), base(), warehouse(), canUpgrade("battery"), level("pickaxe")); print(nearestItem().item, nearestItem("stone").item, nearestOre().obstacle)',
+      { host },
+    );
+    expect(last.kind).toBe('finished');
+    expect(host.printed[0]).toContain('80 100 3 10');
+    expect(host.printed[0]).toContain('true 1');
+    expect(host.printed[1]).toContain('stone stone ore');
+    expect(host.itemRequests).toEqual([null, 'stone']);
+  });
+
+  it('suporta ações de base e rejeita tipos de item ou melhoria desconhecidos', () => {
+    const host = new FakeHost();
+    const result = runScript(
+      'recharge(); collect(); unload(); mine(); upgrade("battery"); goNextTo(2, 3); face(-1, 0)',
+      { host },
+    );
+    expect(result.actions.map((action) => action.kind)).toEqual([
+      'recharge',
+      'collect',
+      'unload',
+      'mine',
+      'upgrade',
+      'turnLeft',
+    ]);
+    expect(runScript('nearestItem("laser")').last.kind).toBe('error');
+    expect(runScript('upgrade("laser")').last.kind).toBe('error');
+  });
+
+  it('cobre rotas sem caminho e todas as direções de face', () => {
+    const noPath = new FakeHost();
+    noPath.path = null;
+    expect(
+      runScript('print(goTo(2, 2))', { host: noPath }).host.printed,
+    ).toEqual(['false']);
+    const blocked = new FakeHost();
+    blocked.path = ['forward'];
+    expect(
+      runScript('print(goTo(2, 2))', { host: blocked, answer: () => false })
+        .host.printed,
+    ).toEqual(['false']);
+    const invalid = runScript('print(face(0, 0)); print(face(9, 9))');
+    expect(invalid.host.printed).toEqual(['false', 'false']);
+    for (const [source, expected] of [
+      ['face(1, 0)', ['turnRight']],
+      ['face(0, -1)', ['turnRight', 'turnRight']],
+      ['face(-1, 0)', ['turnLeft']],
+    ] as const) {
+      expect(runScript(source).actions.map((action) => action.kind)).toEqual(
+        expected,
+      );
+    }
+  });
+});
+
 describe('ScriptProcess — linguagem', () => {
   it('variáveis, aritmética e textos', () => {
     expect(

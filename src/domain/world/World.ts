@@ -548,4 +548,3 @@ function toPair({ x, y }: Position): [number, number] {
 function pick<T>(items: readonly T[], random: Random): T | undefined {
   return items[Math.floor(random() * items.length)];
 }
-

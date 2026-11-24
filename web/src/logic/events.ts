@@ -1,4 +1,10 @@
-import type { EventDTO } from '../api/types.js';
+import type {
+  ActionDTO,
+  EventDTO,
+  FailReasonDTO,
+  ItemDTO,
+  UpgradeDTO,
+} from '../api/types.js';
 import { ORIENTATION_NAMES } from './mapCells.js';
 
 // quiet: passos de rotina; print: saída do script; warn: algo bloqueou; error: o script quebrou
@@ -62,6 +68,33 @@ export function describeEvent(event: EventDTO): {
         text: `apagou o mapa: esqueceu ${String(event.forgotten)} ${event.forgotten === 1 ? 'casa' : 'casas'}`,
         tone: 'info',
       };
+    case 'recharged':
+      return {
+        text: `recarregou ${String(event.added)}; bateria ${String(event.battery)}`,
+        tone: 'info',
+      };
+    case 'collected':
+      return { text: `coletou ${itemName(event.item)}`, tone: 'info' };
+    case 'unloaded':
+      return {
+        text: `descarregou ${String(event.count)} itens na base`,
+        tone: 'info',
+      };
+    case 'mined':
+      return {
+        text: `minerou ${itemName(event.item)} em ${at(event.at)}${event.depleted ? '; jazida esgotada' : ''}`,
+        tone: 'info',
+      };
+    case 'upgraded':
+      return {
+        text: `melhoria ${upgradeName(event.upgrade)} no nível ${String(event.level)}`,
+        tone: 'info',
+      };
+    case 'failed':
+      return {
+        text: `${actionName(event.action)} falhou: ${failureName(event.reason)}`,
+        tone: 'warn',
+      };
     case 'printed':
       return { text: event.text, tone: 'print' };
     case 'finished':
@@ -72,6 +105,64 @@ export function describeEvent(event: EventDTO): {
         tone: 'error',
       };
   }
+}
+
+function itemName(item: ItemDTO): string {
+  return (
+    (
+      {
+        branch: 'galho',
+        stone: 'pedra',
+        log: 'tronco',
+        iron: 'minério de ferro',
+      } as Record<string, string>
+    )[item] ?? item
+  );
+}
+
+function upgradeName(upgrade: UpgradeDTO): string {
+  return (
+    (
+      {
+        pickaxe: 'picareta',
+        battery: 'bateria',
+        cargo: 'compartimento',
+        vision: 'visão',
+        warehouse: 'armazém',
+      } as Record<string, string>
+    )[upgrade] ?? upgrade
+  );
+}
+
+function actionName(action: ActionDTO): string {
+  return (
+    (
+      {
+        recharge: 'recarga',
+        collect: 'coleta',
+        unload: 'descarga',
+        mine: 'mineração',
+        upgrade: 'melhoria',
+      } as Record<string, string>
+    )[action] ?? action
+  );
+}
+
+function failureName(reason: FailReasonDTO): string {
+  return (
+    (
+      {
+        noBattery: 'bateria vazia',
+        notAtBase: 'fora da base',
+        nothing: 'nada disponível',
+        full: 'armazenamento cheio',
+        empty: 'compartimento vazio',
+        noTool: 'falta ferramenta',
+        maxLevel: 'nível máximo',
+        missing: 'faltam itens',
+      } as Record<string, string>
+    )[reason] ?? reason
+  );
 }
 
 export const LOG_LIMIT = 400;

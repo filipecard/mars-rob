@@ -5,6 +5,10 @@ import { Command } from '../../../../src/domain/value-objects/Command.js';
 import { Grid } from '../../../../src/domain/value-objects/Grid.js';
 import { Obstacle } from '../../../../src/domain/value-objects/Obstacle.js';
 import { Position } from '../../../../src/domain/value-objects/Position.js';
+import {
+  STATIC_WORLD_SETTINGS,
+  World,
+} from '../../../../src/domain/world/World.js';
 
 const at = (x: number, y: number): Position => Position.create(x, y);
 
@@ -243,5 +247,44 @@ describe('FleetRobotHost.nearestUnknown — RN22', () => {
     const host = new FleetRobotHost(fleet, 1, () => undefined);
 
     expect(host.nearestUnknown()).toBeNull();
+  });
+});
+
+describe('FleetRobotHost — recursos do mundo', () => {
+  it('acha itens por tipo e jazidas conhecidas, e devolve null quando não há correspondência', () => {
+    const world = World.create(Grid.square(4), STATIC_WORLD_SETTINGS);
+    world.placeItem(at(0, 1), 'branch');
+    const fleet = Fleet.place(world, [{ position: at(0, 0) }]);
+    const host = new FleetRobotHost(fleet, 1, () => undefined);
+    expect(host.nearestItem(null)?.item).toBe('branch');
+    expect(host.nearestItem('branch')?.item).toBe('branch');
+    expect(host.nearestItem('iron')).toBeNull();
+    expect(host.nearestOre()).toBeNull();
+  });
+
+  it('mostra estado e pode consultar melhorias na base', () => {
+    const world = World.create(Grid.square(4), STATIC_WORLD_SETTINGS);
+    const fleet = Fleet.place(world, [{ position: at(0, 0) }]);
+    const host = new FleetRobotHost(fleet, 1, () => undefined);
+    expect(host.base()).toEqual({ x: 0, y: 0 });
+    expect(host.status()).toMatchObject({
+      battery: 100,
+      maxBattery: 100,
+      cargo: 0,
+      maxCargo: 10,
+    });
+    expect(host.warehouse()).toMatchObject({ used: 0, capacity: 50 });
+    expect(host.canUpgrade('pickaxe')).toBe(false);
+    for (let i = 0; i < 3; i++) world.warehouse.add('branch');
+    for (let i = 0; i < 2; i++) world.warehouse.add('stone');
+    expect(host.canUpgrade('pickaxe')).toBe(true);
+  });
+
+  it('acha jazida conhecida ao lado de uma posição alcançável', () => {
+    const world = World.create(Grid.square(4), STATIC_WORLD_SETTINGS);
+    world.addOre(at(2, 1));
+    const fleet = Fleet.place(world, [{ position: at(2, 0) }]);
+    const host = new FleetRobotHost(fleet, 1, () => undefined);
+    expect(host.nearestOre()).toMatchObject({ x: 2, y: 1, obstacle: 'ore' });
   });
 });

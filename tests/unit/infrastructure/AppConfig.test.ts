@@ -103,7 +103,10 @@ describe('parseConfig', () => {
     [{ semente: 2 ** 32 }, '"semente"'],
     [{ semente: 'abc' }, '"semente"'],
     [{ bateria: 3 }, '"bateria" deve ser um objeto'],
-    [{ bateria: { maxima: 0 } }, '"bateria.maxima" deve ser um inteiro maior ou igual a 1'],
+    [
+      { bateria: { maxima: 0 } },
+      '"bateria.maxima" deve ser um inteiro maior ou igual a 1',
+    ],
     [{ mundo: { pedras: -1 } }, '"mundo.pedras"'],
     [{ armazenamento: { robo: 1.5 } }, '"armazenamento.robo"'],
   ])('rejeita %j', (raw, text) => {
