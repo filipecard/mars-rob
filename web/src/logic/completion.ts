@@ -142,7 +142,7 @@ function declaredSuggestion({
   };
 }
 
-// Nomes declarados com let, function ou como parâmetro de função
+// Nomes declarados com let, function, class ou como parâmetro de função ou método
 export function declaredNames(
   source: string,
 ): { name: string; isFunction: boolean }[] {
@@ -154,6 +154,10 @@ export function declaredNames(
   };
   for (const [, name = ''] of source.matchAll(/\blet\s+([A-Za-z_]\w*)/g)) {
     add(name, false);
+  }
+  // Classes entram como função: depois de "new" o editor completa Nome()
+  for (const [, name = ''] of source.matchAll(/\bclass\s+([A-Za-z_]\w*)/g)) {
+    add(name, true);
   }
   for (const [, name = '', params = ''] of source.matchAll(
     /\bfunction\s+([A-Za-z_]\w*)\s*\(([^)]*)\)/g,

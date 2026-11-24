@@ -1,4 +1,4 @@
-import type { Statement } from './ast.js';
+import type { MethodDeclaration, Statement } from './ast.js';
 import type { Action } from './host.js';
 import type { SourceLocation } from './ScriptError.js';
 
@@ -9,8 +9,8 @@ export interface ListValue {
   items: Value[];
 }
 
-// Objetos nativos, só de leitura: casa, posição e o próprio robô (self)
-export type RecordType = 'cell' | 'position' | 'robot';
+// Objetos nativos, só de leitura: casa, posição, o próprio robô (self) e o armazém
+export type RecordType = 'cell' | 'position' | 'robot' | 'storage';
 
 export interface RecordValue {
   kind: 'record';
@@ -24,6 +24,23 @@ export interface FunctionValue {
   params: string[];
   body: Statement[];
   closure: Scope;
+  // Método de um objeto: o valor de "this" dentro dele
+  receiver?: ObjectValue;
+}
+
+// Classe do usuário: os métodos ficam guardados e viram funções ao criar o objeto
+export interface ClassValue {
+  kind: 'class';
+  name: string;
+  methods: ReadonlyMap<string, MethodDeclaration>;
+  closure: Scope;
+}
+
+// Objeto criado com new: campos livres (this.x = ...) e os métodos da classe
+export interface ObjectValue {
+  kind: 'object';
+  class: ClassValue;
+  fields: Map<string, Value>;
 }
 
 // Execução que pode pausar: entrega ações (yield), recebe se deram certo e devolve um valor
@@ -46,7 +63,9 @@ export type Value =
   | ListValue
   | RecordValue
   | FunctionValue
-  | NativeValue;
+  | NativeValue
+  | ClassValue
+  | ObjectValue;
 
 // Escopo léxico: cada bloco e cada chamada de função tem o seu
 export class Scope {
@@ -71,6 +90,14 @@ export class Scope {
   // O escopo mais próximo que tem a variável
   owner(name: string): Scope | undefined {
     return this.has(name) ? this : this.parent?.owner(name);
+  }
+
+  // Todos os nomes visíveis daqui (para sugerir nomes parecidos nos erros)
+  *names(): Generator<string> {
+    yield* this.#variables.keys();
+    if (this.parent !== null) {
+      yield* this.parent.names();
+    }
   }
 
   get(name: string): Value {
@@ -117,12 +144,38 @@ export function typeName(value: Value): string {
     case 'function':
     case 'native':
       return 'function';
+    case 'class':
+      return 'class';
+    case 'object':
+      return value.class.name;
   }
 }
 
-// Primitivos comparam pelo valor; listas, objetos e funções pela identidade
+// Primitivos e objetos nativos (casa, posição, robô) comparam pelo valor;
+// listas, funções, classes e objetos criados com new, pela identidade
 export function equals(a: Value, b: Value): boolean {
-  return a === b;
+  if (a === b) {
+    return true;
+  }
+  if (
+    a === null ||
+    b === null ||
+    typeof a !== 'object' ||
+    typeof b !== 'object' ||
+    a.kind !== 'record' ||
+    b.kind !== 'record' ||
+    a.type !== b.type ||
+    a.fields.size !== b.fields.size
+  ) {
+    return false;
+  }
+  for (const [name, value] of a.fields) {
+    const other = b.fields.get(name);
+    if (other === undefined || !equals(value, other)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export function toText(value: Value): string {
@@ -140,10 +193,37 @@ export function toText(value: Value): string {
     case 'function':
     case 'native':
       return `function ${value.name}`;
+    case 'class':
+      return `class ${value.name}`;
+    case 'object':
+      return objectText(value);
   }
 }
 
+// Explorer { passos: 3, limite: 10 }
+function objectText(object: ObjectValue): string {
+  const fields = [...object.fields]
+    .map(([name, value]) => `${name}: ${nestedText(value)}`)
+    .join(', ');
+  return fields === ''
+    ? `${object.class.name} {}`
+    : `${object.class.name} { ${fields} }`;
+}
+
+// Um objeto dentro de outro (ou dele mesmo) aparece só pelo nome da classe
+function nestedText(value: Value): string {
+  return value !== null && typeof value === 'object' && value.kind === 'object'
+    ? value.class.name
+    : toText(value);
+}
+
 function recordText({ type, fields }: RecordValue): string {
+  if (type === 'storage') {
+    const parts = [...fields].map(
+      ([name, value]) => `${name}: ${toText(value)}`,
+    );
+    return `storage { ${parts.join(', ')} }`;
+  }
   if (type === 'position') {
     return `(${toText(fields.get('x') ?? null)}, ${toText(fields.get('y') ?? null)})`;
   }

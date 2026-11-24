@@ -3,6 +3,7 @@ import type {
   AssignTarget,
   BinaryOperator,
   Expression,
+  MethodDeclaration,
   Program,
   Statement,
 } from './ast.js';
@@ -10,6 +11,12 @@ import { tokenize, type Keyword, type Token } from './lexer.js';
 import { ScriptSyntaxError, type SourceLocation } from './ScriptError.js';
 
 const ASSIGN_OPERATORS: readonly string[] = ['=', '+=', '-=', '*=', '/='];
+
+// Operadores escritos por extenso, comuns em outras linguagens
+const WORD_OPERATORS: Readonly<Record<string, string>> = {
+  and: '&&',
+  or: '||',
+};
 
 // Precedência, da mais fraca para a mais forte (|| e && ficam à parte: são lógicos)
 const BINARY_LEVELS: readonly (readonly BinaryOperator[])[] = [
@@ -31,6 +38,8 @@ class Parser {
   // Para validar return/break/continue fora de lugar
   #functionDepth = 0;
   #loopDepth = 0;
+  // Dentro dos métodos de uma classe, "this" é o objeto
+  #methodDepth = 0;
 
   constructor(tokens: Token[]) {
     this.#tokens = tokens;
@@ -60,6 +69,8 @@ class Parser {
           return this.#for();
         case 'function':
           return this.#function();
+        case 'class':
+          return this.#class();
         case 'return':
           return this.#return();
         case 'break':
@@ -72,12 +83,37 @@ class Parser {
     if (this.#isPunctuation('{')) {
       return this.#block();
     }
+    if (
+      token.kind === 'identifier' &&
+      (token.value === 'var' || token.value === 'const') &&
+      this.#peek(1).kind === 'identifier'
+    ) {
+      throw this.#error(
+        `use "let" para declarar variáveis (não existe "${token.value}")`,
+        token.location,
+      );
+    }
     return this.#endSimple(this.#simple());
   }
 
   #endSimple(statement: Statement): Statement {
+    this.#rejectWordOperator();
     this.#matchPunctuation(';');
     return statement;
+  }
+
+  // "a and b" seria lido como três comandos soltos: avisa antes
+  #rejectWordOperator(): void {
+    const token = this.#peek();
+    if (token.kind === 'identifier') {
+      const symbol = WORD_OPERATORS[token.value];
+      if (symbol !== undefined) {
+        throw this.#error(
+          `use "${symbol}" em vez de "${token.value}"`,
+          token.location,
+        );
+      }
+    }
   }
 
   #block(): Statement & { kind: 'block' } {
@@ -195,6 +231,15 @@ class Parser {
   #function(): Statement {
     const { location } = this.#expectKeyword('function');
     const name = this.#expectIdentifier();
+    const { params, body } = this.#callable(location);
+    return { kind: 'function', name, params, body, location };
+  }
+
+  // Parâmetros e corpo de uma função ou método
+  #callable(location: SourceLocation): {
+    params: string[];
+    body: Statement[];
+  } {
     this.#expectPunctuation('(');
     const params: string[] = [];
     if (!this.#isPunctuation(')')) {
@@ -213,11 +258,60 @@ class Parser {
     this.#loopDepth = 0;
     try {
       const { body } = this.#block();
-      return { kind: 'function', name, params, body, location };
+      return { params, body };
     } finally {
       this.#functionDepth--;
       this.#loopDepth = outerLoops;
     }
+  }
+
+  // class Nome { constructor(a) { this.a = a } metodo() { ... } }
+  #class(): Statement {
+    const { location } = this.#expectKeyword('class');
+    const name = this.#expectIdentifier();
+    if (this.#peekIdentifier('extends')) {
+      throw this.#error('herança ("extends") ainda não existe', location);
+    }
+    const open = this.#expectPunctuation('{');
+    const methods: MethodDeclaration[] = [];
+    while (!this.#matchPunctuation('}')) {
+      if (this.#peek().kind === 'end') {
+        throw this.#error('faltou fechar a classe com "}"', open.location);
+      }
+      if (this.#isKeyword('function')) {
+        throw this.#error(
+          'dentro da classe, escreva só o nome do método: nome(a, b) { ... }',
+          this.#peek().location,
+        );
+      }
+      const method = this.#method();
+      if (methods.some((other) => other.name === method.name)) {
+        throw this.#error(
+          `o método "${method.name}" aparece duas vezes em ${name}`,
+          method.location,
+        );
+      }
+      methods.push(method);
+      this.#matchPunctuation(';');
+    }
+    return { kind: 'class', name, methods, location };
+  }
+
+  #method(): MethodDeclaration {
+    const { location } = this.#peek();
+    const name = this.#expectIdentifier();
+    this.#methodDepth++;
+    try {
+      const { params, body } = this.#callable(location);
+      return { name, params, body, location };
+    } finally {
+      this.#methodDepth--;
+    }
+  }
+
+  #peekIdentifier(value: string): boolean {
+    const token = this.#peek();
+    return token.kind === 'identifier' && token.value === value;
   }
 
   #return(): Statement {
@@ -302,6 +396,15 @@ class Parser {
         return left;
       }
       this.#advance();
+      if (
+        (token.value === '==' || token.value === '!=') &&
+        this.#isPunctuation('=')
+      ) {
+        throw this.#error(
+          `use "${token.value}" (não existe "${token.value}=")`,
+          token.location,
+        );
+      }
       left = {
         kind: 'binary',
         operator: token.value as BinaryOperator,
@@ -357,8 +460,33 @@ class Parser {
       case 'string':
         return { kind: 'string', value: token.value, location };
       case 'identifier':
+        if (token.value === 'not' && this.#startsExpression()) {
+          throw this.#error(
+            'use "!" em vez de "not" (ex.: !front().isEmpty)',
+            location,
+          );
+        }
         return { kind: 'identifier', name: token.value, location };
       case 'keyword':
+        if (token.value === 'this') {
+          if (this.#methodDepth === 0) {
+            throw this.#error(
+              '"this" só existe dentro dos métodos de uma classe (o robô é "self")',
+              location,
+            );
+          }
+          return { kind: 'this', location };
+        }
+        if (token.value === 'new') {
+          const name = this.#expectIdentifier();
+          this.#expectPunctuation('(');
+          return {
+            kind: 'new',
+            callee: { kind: 'identifier', name, location },
+            args: this.#list(')'),
+            location,
+          };
+        }
         if (token.value === 'true' || token.value === 'false') {
           return { kind: 'boolean', value: token.value === 'true', location };
         }
@@ -395,6 +523,19 @@ class Parser {
     }
     this.#expectPunctuation(close);
     return items;
+  }
+
+  // O próximo token pode começar uma expressão (para reconhecer "not x")
+  #startsExpression(): boolean {
+    const token = this.#peek();
+    return (
+      token.kind === 'identifier' ||
+      token.kind === 'number' ||
+      token.kind === 'string' ||
+      (token.kind === 'keyword' &&
+        ['true', 'false', 'null', 'this', 'new'].includes(token.value)) ||
+      (token.kind === 'punctuation' && ['!', '['].includes(token.value))
+    );
   }
 
   // --- tokens
@@ -468,6 +609,7 @@ class Parser {
   }
 
   #unexpected(expected: string): ScriptSyntaxError {
+    this.#rejectWordOperator();
     const token = this.#peek();
     const found =
       token.kind === 'end' ? 'o fim do script' : `"${String(token.value)}"`;

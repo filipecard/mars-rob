@@ -1,17 +1,28 @@
 import type { Fleet } from '../entities/Fleet.js';
-import { VISION_RANGE, type Robot } from '../entities/Robot.js';
+import type { Robot } from '../entities/Robot.js';
 import type {
   CellInfo,
   Heading,
   RobotHost,
   SelfInfo,
   Side,
+  StatusInfo,
   StepKind,
+  StorageInfo,
 } from '../script/host.js';
-import { keyOf } from '../value-objects/Obstacle.js';
+import { keyOf, sideNeighbors } from '../value-objects/Obstacle.js';
 import { step, type Direction } from '../value-objects/Direction.js';
 import { toAbsolute, type Orientation } from '../value-objects/Orientation.js';
 import { Position } from '../value-objects/Position.js';
+import type { ItemKind } from '../world/Item.js';
+import { checkUpgrade, upgradeLevels } from '../world/purchaseUpgrade.js';
+import {
+  isBlockingGround,
+  type CellSnapshot,
+  type Ground,
+} from '../world/Terrain.js';
+import type { UpgradeKind } from '../world/Upgrade.js';
+import type { World } from '../world/World.js';
 
 const HEADINGS: Record<Orientation, Heading> = {
   N: 'north',
@@ -29,7 +40,7 @@ const SIDES: Record<Side, Direction> = {
 };
 
 // RN18: os sensores do script de um robô, lidos da frota. O robô só sabe o que
-// está na visão atual (RN12) ou no próprio mapa.
+// está na visão atual (RN12) ou no próprio mapa, como estava quando ele viu (RN29).
 export class FleetRobotHost implements RobotHost {
   readonly #fleet: Fleet;
   readonly #id: number;
@@ -43,6 +54,10 @@ export class FleetRobotHost implements RobotHost {
 
   get #robot(): Robot {
     return this.#fleet.robot(this.#id);
+  }
+
+  get #world(): World {
+    return this.#fleet.world;
   }
 
   self(): SelfInfo {
@@ -64,10 +79,10 @@ export class FleetRobotHost implements RobotHost {
 
   // Norte para cima: da linha de cima para a de baixo, da esquerda para a direita
   see(): CellInfo[] {
-    const { position } = this.#robot;
+    const { position, visionRange } = this.#robot;
     const cells: CellInfo[] = [];
-    for (let dy = 1; dy >= -1; dy--) {
-      for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = visionRange; dy >= -visionRange; dy--) {
+      for (let dx = -visionRange; dx <= visionRange; dx++) {
         if (dx !== 0 || dy !== 0) {
           cells.push(this.cellAt(position.x + dx, position.y + dy));
         }
@@ -76,24 +91,14 @@ export class FleetRobotHost implements RobotHost {
     return cells;
   }
 
-  // RN12: na visão atual, o que há de fato; fora dela, o que o mapa do robô sabe
+  // RN12: na visão atual, o que há de fato; fora dela, o que o mapa do robô lembra
   // (sem os outros robôs, que podem ter saído do lugar)
   cellAt(x: number, y: number): CellInfo {
-    const { grid } = this.#fleet;
     const robot = this.#robot;
     const position = Position.create(x, y);
-    if (!grid.contains(position)) {
-      return {
-        type: 'edge',
-        x,
-        y,
-        robot: null,
-        visited: false,
-        unknownAround: 0,
-      };
-    }
-    const cell = (
+    const info = (
       type: CellInfo['type'],
+      seen: CellSnapshot | null,
       other: number | null = null,
     ): CellInfo => ({
       type,
@@ -101,28 +106,42 @@ export class FleetRobotHost implements RobotHost {
       y,
       robot: other,
       visited: robot.hasVisited(position),
-      unknownAround: this.#unknownAround(position),
+      unknownAround:
+        type === 'edge' ? 0 : this.#unknownAround(position),
+      item: seen?.item ?? null,
+      obstacle:
+        seen !== null && isBlockingGround(seen.ground)
+          ? (seen.ground as 'rock' | 'tree' | 'ore')
+          : null,
+      isBase: seen?.ground === 'base',
     });
+    if (!this.#world.contains(position)) {
+      return info('edge', null);
+    }
     if (robot.canSee(position)) {
+      const seen = this.#world.describe(position);
       const occupant = this.#fleet.robotAt(position);
       if (occupant !== undefined) {
-        return cell('robot', occupant);
+        return info('robot', seen, occupant);
       }
-    } else if (!robot.hasExplored(position)) {
-      return cell('unknown');
+      return info(groundType(seen.ground), seen);
     }
-    return cell(grid.isBlocked(position) ? 'obstacle' : 'empty');
+    const remembered = robot.memoryOf(position);
+    if (remembered === undefined) {
+      return info('unknown', null);
+    }
+    return info(groundType(remembered.ground), remembered);
   }
 
-  // RN19: casas da malha no 3x3 em volta da casa que o robô ainda não conhece
+  // RN19: casas da malha na visão em volta da casa que o robô ainda não conhece
   #unknownAround(center: Position): number {
-    const { grid } = this.#fleet;
     const robot = this.#robot;
+    const range = robot.visionRange;
     let count = 0;
-    for (let dx = -VISION_RANGE; dx <= VISION_RANGE; dx++) {
-      for (let dy = -VISION_RANGE; dy <= VISION_RANGE; dy++) {
+    for (let dx = -range; dx <= range; dx++) {
+      for (let dy = -range; dy <= range; dy++) {
         const near = center.translate(dx, dy);
-        if (grid.contains(near) && !robot.hasExplored(near)) {
+        if (this.#world.contains(near) && !robot.hasExplored(near)) {
           count++;
         }
       }
@@ -146,6 +165,19 @@ export class FleetRobotHost implements RobotHost {
     return found === null ? null : found.steps;
   }
 
+  // O menor caminho até uma casa ao lado (sem diagonal) de (x, y)
+  pathNextTo(x: number, y: number): StepKind[] | null {
+    const target = Position.create(x, y);
+    if (!this.#world.contains(target)) {
+      return null;
+    }
+    const found = this.#search(
+      (cell) => Math.abs(cell.x - x) + Math.abs(cell.y - y) === 1,
+      () => false,
+    );
+    return found === null ? null : found.steps;
+  }
+
   // RN22: a casa conhecida e livre mais próxima (em passos, pelo mapa do robô) de onde
   // ele vê alguma casa desconhecida. null se não há nenhuma ao alcance.
   nearestUnknown(): CellInfo | null {
@@ -156,12 +188,35 @@ export class FleetRobotHost implements RobotHost {
     return found === null ? null : this.cellAt(found.cell.x, found.cell.y);
   }
 
+  // RN25: a casa mais próxima onde o robô lembra de ter visto um item
+  nearestItem(kind: ItemKind | null): CellInfo | null {
+    const robot = this.#robot;
+    const found = this.#search((cell) => {
+      const item = robot.memoryOf(cell)?.item ?? null;
+      return item !== null && (kind === null || item === kind);
+    }, () => false);
+    return found === null ? null : this.cellAt(found.cell.x, found.cell.y);
+  }
+
+  // RN27: a jazida conhecida mais próxima, ao lado de uma casa que o robô alcança
+  nearestOre(): CellInfo | null {
+    const robot = this.#robot;
+    const isOre = (cell: Position): boolean =>
+      robot.memoryOf(cell)?.ground === 'ore';
+    const found = this.#search(
+      (cell) => sideNeighbors(cell).some(isOre),
+      () => false,
+    );
+    const ore = found === null ? undefined : sideNeighbors(found.cell).find(isOre);
+    return ore === undefined ? null : this.cellAt(ore.x, ore.y);
+  }
+
   #isKnownFree(cell: Position): boolean {
-    const { grid } = this.#fleet;
+    const seen = this.#robot.memoryOf(cell);
     return (
-      grid.contains(cell) &&
-      this.#robot.hasExplored(cell) &&
-      !grid.isBlocked(cell)
+      this.#world.contains(cell) &&
+      seen !== undefined &&
+      !isBlockingGround(seen.ground)
     );
   }
 
@@ -220,9 +275,44 @@ export class FleetRobotHost implements RobotHost {
     return this.#robot.explored.length;
   }
 
+  // RN24, RN25, RN28
+  status(): StatusInfo {
+    const robot = this.#robot;
+    return {
+      battery: robot.battery,
+      maxBattery: robot.maxBattery,
+      cargo: robot.cargo.used,
+      maxCargo: robot.cargo.capacity,
+      inventory: robot.cargo.list(),
+      levels: upgradeLevels(this.#world, robot),
+    };
+  }
+
+  base(): { x: number; y: number } {
+    const { x, y } = this.#world.base;
+    return { x, y };
+  }
+
+  warehouse(): StorageInfo {
+    const { warehouse } = this.#world;
+    return {
+      items: warehouse.counts(),
+      used: warehouse.used,
+      capacity: warehouse.capacity,
+    };
+  }
+
+  canUpgrade(kind: UpgradeKind): boolean {
+    return checkUpgrade(this.#world, this.#robot, kind).ok;
+  }
+
   print(text: string): void {
     this.#print(text);
   }
+}
+
+function groundType(ground: Ground): CellInfo['type'] {
+  return isBlockingGround(ground) ? 'obstacle' : 'empty';
 }
 
 // Os passos sem giro e a direção relativa de cada um (RN03)

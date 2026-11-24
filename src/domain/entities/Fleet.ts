@@ -5,7 +5,14 @@ import type { Command } from '../value-objects/Command.js';
 import type { Grid } from '../value-objects/Grid.js';
 import type { Orientation } from '../value-objects/Orientation.js';
 import { Position } from '../value-objects/Position.js';
-import { Robot } from './Robot.js';
+import type { Terrain } from '../world/Terrain.js';
+import { World } from '../world/World.js';
+import {
+  DEFAULT_ROBOT_SETTINGS,
+  Robot,
+  type RobotSettings,
+  type RobotSnapshot,
+} from './Robot.js';
 
 // RN13: 1 robô a cada 3 de limite (limite 15: 5 robôs; 18: 6; 21: 7), e pelo menos 1
 export function maxRobots(limit: number): number {
@@ -20,7 +27,7 @@ export interface Placement {
 // RN13: o robô 1 nasce na origem; os outros, em casas livres sorteadas, sem nascer
 // encostado (nem na diagonal) em outro robô
 export function startingPositions(
-  grid: Grid,
+  grid: Terrain,
   count: number,
   random: Random,
 ): Position[] {
@@ -55,18 +62,25 @@ function touches(a: Position, b: Position): boolean {
   return Math.abs(a.x - b.x) <= 1 && Math.abs(a.y - b.y) <= 1;
 }
 
-// Agregado: os robôs da malha, identificados por ID (1, 2, 3...). Cada robô tem o próprio mapa (RN12).
+// Agregado: os robôs do mundo, identificados por ID (1, 2, 3...). Cada robô tem o próprio mapa (RN12).
 export class Fleet {
-  readonly grid: Grid;
+  readonly world: World;
   readonly #robots: ReadonlyMap<number, Robot>;
 
-  private constructor(grid: Grid, robots: ReadonlyMap<number, Robot>) {
-    this.grid = grid;
+  private constructor(world: World, robots: ReadonlyMap<number, Robot>) {
+    this.world = world;
     this.#robots = robots;
   }
 
-  // RN13: `count` robôs, de 1 a maxRobots(limite), olhando para o Norte
-  static create(grid: Grid, count: number, random: Random): Fleet {
+  // RN13: `count` robôs, de 1 a maxRobots(limite), olhando para o Norte.
+  // Uma Grid pronta vira um mundo parado (sem árvores, jazidas nem itens).
+  static create(
+    terrain: Grid | World,
+    count: number,
+    random: Random,
+    settings: RobotSettings = DEFAULT_ROBOT_SETTINGS,
+  ): Fleet {
+    const grid = terrain;
     const limit = (grid.max - grid.min) / 2;
     const max = maxRobots(limit);
     if (!Number.isInteger(count) || count < 1 || count > max) {
@@ -77,14 +91,20 @@ export class Fleet {
     return Fleet.place(
       grid,
       startingPositions(grid, count, random).map((position) => ({ position })),
+      settings,
     );
   }
 
   // Robôs em posições escolhidas (usado nos testes). O ID é a ordem na lista, a partir de 1.
-  static place(grid: Grid, placements: readonly Placement[]): Fleet {
+  static place(
+    terrain: Grid | World,
+    placements: readonly Placement[],
+    settings: RobotSettings = DEFAULT_ROBOT_SETTINGS,
+  ): Fleet {
     if (placements.length < 1) {
       throw new RangeError('A frota precisa de pelo menos 1 robô');
     }
+    const world = terrain instanceof World ? terrain : World.of(terrain);
     const robots = new Map<number, Robot>();
     placements.forEach(({ position, orientation }, index) => {
       const taken = [...robots.values()].some((robot) =>
@@ -93,9 +113,30 @@ export class Fleet {
       if (taken) {
         throw new RangeError('Dois robôs não podem começar na mesma posição');
       }
-      robots.set(index + 1, Robot.create(grid, position, orientation));
+      robots.set(
+        index + 1,
+        Robot.create(world, position, orientation, settings),
+      );
     });
-    return new Fleet(grid, robots);
+    return new Fleet(world, robots);
+  }
+
+  // RN29: os robôs salvos, na ordem dos IDs
+  static restore(
+    world: World,
+    snapshots: readonly RobotSnapshot[],
+    settings: RobotSettings,
+  ): Fleet {
+    const robots = new Map<number, Robot>();
+    snapshots.forEach((snapshot, index) => {
+      robots.set(index + 1, Robot.restore(world, snapshot, settings));
+    });
+    return new Fleet(world, robots);
+  }
+
+  // Todos os robôs, em ordem de ID
+  get robots(): Robot[] {
+    return [...this.#robots.values()];
   }
 
   get ids(): number[] {
@@ -125,7 +166,7 @@ export class Fleet {
     if (!sender.isNextTo(receiver)) {
       throw new NotAdjacentError(from, to);
     }
-    return receiver.receiveMap(sender.explored);
+    return receiver.receiveMap(sender.memory());
   }
 
   // ID do robô (diferente de `except`) que está na posição

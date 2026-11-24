@@ -18,9 +18,13 @@ describe('formatWelcome', () => {
       '  DE>PARA      envia o mapa de um robô para outro que está ao lado, ex.: 1>2',
       'Comandos:',
       '  script ID    programa um robô; termine o script com uma linha "fim"',
-      '  ticks N      avança até N ticks',
+      '  ticks N      avança N ticks (o mundo anda mesmo sem robô rodando)',
       '  parar ID     para o programa de um robô',
       '  mapa ID      mostra o mapa de um robô',
+      '  estado ID    bateria, compartimento e melhorias do robô, e o armazém',
+      '  melhorar ID M faz a melhoria M com o robô na base (picareta, bateria, compartimento, visao, armazem)',
+      '  apagar ID    apaga o mapa de um robô',
+      '  salvar NOME   salva a simulação; carregar NOME carrega; salvos lista',
       '  sair         encerra',
     ]);
   });

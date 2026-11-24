@@ -15,6 +15,7 @@ import {
 import type { Action, RobotHost } from './host.js';
 import { parse } from './parser.js';
 import { ScriptRuntimeError, type SourceLocation } from './ScriptError.js';
+import { didYouMean } from './suggest.js';
 import {
   equals,
   isTruthy,
@@ -25,6 +26,7 @@ import {
   type FunctionValue,
   type ListValue,
   type NativeValue,
+  type ObjectValue,
   type Value,
 } from './values.js';
 
@@ -34,6 +36,9 @@ export const MAX_CALL_DEPTH = 200;
 
 // Nome reservado: sempre o estado atual do robô
 const SELF = 'self';
+// Onde o método guarda o objeto ("this" é palavra reservada: o script não declara)
+const THIS = 'this';
+const CONSTRUCTOR = 'constructor';
 
 type Completion =
   | { type: 'normal' }
@@ -136,7 +141,7 @@ class Interpreter {
 
   // --- comandos
 
-  // Funções podem ser chamadas antes da linha em que foram declaradas (hoisting)
+  // Funções e classes podem ser usadas antes da linha em que foram declaradas (hoisting)
   *#block(body: Statement[], scope: Scope): Execution<Completion> {
     for (const statement of body) {
       if (statement.kind === 'function') {
@@ -147,10 +152,19 @@ class Interpreter {
           body: statement.body,
           closure: scope,
         });
+      } else if (statement.kind === 'class') {
+        this.#declare(scope, statement.name, statement.location, {
+          kind: 'class',
+          name: statement.name,
+          methods: new Map(
+            statement.methods.map((method) => [method.name, method]),
+          ),
+          closure: scope,
+        });
       }
     }
     for (const statement of body) {
-      if (statement.kind === 'function') {
+      if (statement.kind === 'function' || statement.kind === 'class') {
         continue;
       }
       const completion = yield* this.#statement(statement, scope);
@@ -221,6 +235,7 @@ class Interpreter {
       case 'forOf':
         return yield* this.#forOf(statement, scope);
       case 'function':
+      case 'class':
         // Já declarada no início do bloco
         return NORMAL;
       case 'return':
@@ -334,11 +349,19 @@ class Interpreter {
         owner.set(target.name, value);
         return;
       }
-      case 'member':
+      case 'member': {
+        const object = yield* this.#expression(target.object, scope);
+        if (isObject(object)) {
+          object.fields.set(target.property, value);
+          return;
+        }
         throw new ScriptRuntimeError(
-          `a propriedade "${target.property}" é só de leitura`,
+          isList(object) || typeof object !== 'object' || object === null
+            ? `não dá para criar a propriedade "${target.property}" em ${typeName(object)}`
+            : `a propriedade "${target.property}" é só de leitura`,
           location,
         );
+      }
       case 'index': {
         const list = yield* this.#expression(target.object, scope);
         const index = integer(
@@ -374,6 +397,11 @@ class Interpreter {
         return expression.value;
       case 'null':
         return null;
+      case 'this':
+        // O parser só aceita "this" dentro de métodos
+        return scope.owner(THIS)?.get(THIS) ?? null;
+      case 'new':
+        return yield* this.#new(expression, scope);
       case 'identifier':
         return this.#lookup(expression.name, scope, location);
       case 'list': {
@@ -434,9 +462,47 @@ class Interpreter {
     }
     const owner = scope.owner(name);
     if (owner === undefined) {
-      throw new ScriptRuntimeError(`"${name}" não foi declarado`, location);
+      throw new ScriptRuntimeError(
+        `"${name}" não foi declarado${didYouMean(name, [SELF, ...scope.names()])}`,
+        location,
+      );
     }
     return owner.get(name);
+  }
+
+  *#new(expression: Expression & { kind: 'new' }, scope: Scope): Execution {
+    const { location } = expression;
+    this.#count(location);
+    const callee = yield* this.#expression(expression.callee, scope);
+    if (
+      callee === null ||
+      typeof callee !== 'object' ||
+      callee.kind !== 'class'
+    ) {
+      throw new ScriptRuntimeError(
+        `"new" precisa de uma classe, recebeu ${typeName(callee)}`,
+        location,
+      );
+    }
+    const args: Value[] = [];
+    for (const arg of expression.args) {
+      args.push(yield* this.#expression(arg, scope));
+    }
+    const object: ObjectValue = {
+      kind: 'object',
+      class: callee,
+      fields: new Map(),
+    };
+    const constructor = bindMethod(object, CONSTRUCTOR);
+    if (constructor !== undefined) {
+      yield* this.#callFunction(constructor, args, location);
+    } else if (args.length > 0) {
+      throw new ScriptRuntimeError(
+        `${callee.name} não tem constructor, então não recebe argumentos`,
+        location,
+      );
+    }
+    return object;
   }
 
   *#call(expression: Expression & { kind: 'call' }, scope: Scope): Execution {
@@ -449,7 +515,7 @@ class Interpreter {
     }
     if (!isCallable(callee)) {
       throw new ScriptRuntimeError(
-        `${typeName(callee)} não é uma função`,
+        notCallable(expression.callee, callee),
         location,
       );
     }
@@ -478,6 +544,9 @@ class Interpreter {
       );
     }
     const scope = new Scope(fn.closure);
+    if (fn.receiver !== undefined) {
+      scope.declare(THIS, fn.receiver);
+    }
     fn.params.forEach((param, i) => {
       scope.declare(param, args[i] ?? null);
     });
@@ -493,6 +562,61 @@ class Interpreter {
 
 function isList(value: Value): value is ListValue {
   return value !== null && typeof value === 'object' && value.kind === 'list';
+}
+
+function isObject(value: Value): value is ObjectValue {
+  return value !== null && typeof value === 'object' && value.kind === 'object';
+}
+
+// O método da classe ligado ao objeto (dentro dele, "this" é o objeto)
+function bindMethod(
+  object: ObjectValue,
+  name: string,
+): FunctionValue | undefined {
+  const method = object.class.methods.get(name);
+  if (method === undefined) {
+    return undefined;
+  }
+  return {
+    kind: 'function',
+    name: `${object.class.name}.${name}`,
+    params: method.params,
+    body: method.body,
+    closure: object.class.closure,
+    receiver: object,
+  };
+}
+
+// Mensagem para quem tentou chamar algo que não é função
+function notCallable(callee: Expression, value: Value): string {
+  if (value !== null && typeof value === 'object' && value.kind === 'class') {
+    return `para criar um ${value.name}, use new ${value.name}(...)`;
+  }
+  if (callee.kind === 'member') {
+    return `"${callee.property}" é um campo, não uma função: use ${source(callee)}, sem os parênteses`;
+  }
+  if (callee.kind === 'identifier') {
+    return `"${callee.name}" não é uma função (é ${typeName(value)})`;
+  }
+  return `${typeName(value)} não é uma função`;
+}
+
+// Um trecho do script reescrito a partir da árvore, para as mensagens de erro
+function source(expression: Expression): string {
+  switch (expression.kind) {
+    case 'identifier':
+      return expression.name;
+    case 'this':
+      return 'this';
+    case 'member':
+      return `${source(expression.object)}.${expression.property}`;
+    case 'call':
+      return `${source(expression.callee)}(${expression.args.length > 0 ? '...' : ''})`;
+    case 'index':
+      return `${source(expression.object)}[...]`;
+    default:
+      return '...';
+  }
 }
 
 function isCallable(value: Value): value is FunctionValue | NativeValue {
@@ -631,6 +755,14 @@ function member(
         return value;
       }
     }
+    if (object.kind === 'object') {
+      const value =
+        object.fields.get(property) ??
+        (property === CONSTRUCTOR ? undefined : bindMethod(object, property));
+      if (value !== undefined) {
+        return value;
+      }
+    }
     if (object.kind === 'list') {
       const listMember = listMethod(object, property);
       if (listMember !== undefined) {
@@ -639,9 +771,30 @@ function member(
     }
   }
   throw new ScriptRuntimeError(
-    `${typeName(object)} não tem a propriedade "${property}"`,
+    `${typeName(object)} não tem a propriedade "${property}"${didYouMean(property, propertiesOf(object))}`,
     location,
   );
+}
+
+const LIST_PROPERTIES = ['length', 'push', 'pop', 'shift', 'includes'];
+
+function propertiesOf(object: Value): string[] {
+  if (object === null || typeof object !== 'object') {
+    return typeof object === 'string' ? ['length'] : [];
+  }
+  switch (object.kind) {
+    case 'record':
+      return [...object.fields.keys()];
+    case 'object':
+      return [
+        ...object.fields.keys(),
+        ...[...object.class.methods.keys()].filter((m) => m !== CONSTRUCTOR),
+      ];
+    case 'list':
+      return LIST_PROPERTIES;
+    default:
+      return [];
+  }
 }
 
 function listMethod(list: ListValue, property: string): Value | undefined {

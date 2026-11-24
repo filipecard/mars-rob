@@ -4,7 +4,13 @@ import type { DescribeSimulation } from '../../application/use-cases/DescribeSim
 import type { ExecuteOrders } from '../../application/use-cases/ExecuteOrders.js';
 import type { ForgetMap } from '../../application/use-cases/ForgetMap.js';
 import type { LoadScript } from '../../application/use-cases/LoadScript.js';
+import type {
+  ListSaves,
+  LoadGame,
+  SaveGame,
+} from '../../application/use-cases/SaveGame.js';
 import type { StopProgram } from '../../application/use-cases/StopProgram.js';
+import type { UpgradeRobot } from '../../application/use-cases/UpgradeRobot.js';
 import { Clock, type ClockDTO, type Timers } from './Clock.js';
 
 export interface HttpUseCases {
@@ -14,6 +20,10 @@ export interface HttpUseCases {
   advanceClock: AdvanceClock;
   stopProgram: StopProgram;
   forgetMap: ForgetMap;
+  upgradeRobot: UpgradeRobot;
+  saveGame: SaveGame;
+  loadGame: LoadGame;
+  listSaves: ListSaves;
 }
 
 // O que o WebSocket envia a cada mudança: o estado inteiro e os eventos novos
@@ -38,7 +48,8 @@ export interface ApiResponse {
 
 type Listener = (update: UpdateMessage) => void;
 
-const ROBOT_ROUTE = /^\/api\/robots\/([1-9]\d*)\/(script|stop|forget)$/;
+const ROBOT_ROUTE =
+  /^\/api\/robots\/([1-9]\d*)\/(script|stop|forget|upgrade)$/;
 
 const error = (status: number, message: string): ApiResponse => ({
   status,
@@ -59,7 +70,7 @@ export class SimulationController {
     options: { timers?: Timers; onError?: (error: unknown) => void } = {},
   ) {
     this.#useCases = useCases;
-    this.clock = new Clock(() => this.#advance(1, false), options);
+    this.clock = new Clock(() => this.#advance(1), options);
   }
 
   subscribe(listener: Listener): () => void {
@@ -90,6 +101,8 @@ export class SimulationController {
           return this.#loadScript(Number(id), body);
         case 'stop':
           return this.#stop(Number(id));
+        case 'upgrade':
+          return this.#upgrade(Number(id), body);
         default:
           return this.#forget(Number(id));
       }
@@ -106,10 +119,19 @@ export class SimulationController {
         this.clock.pause();
         return this.#changed();
       case 'POST /api/clock/step':
-        await this.#advance(1, true);
+        await this.#advance(1);
         return { status: 200, body: this.clock.toDTO() };
       case 'PUT /api/clock/speed':
         return this.#speed(body);
+      case 'GET /api/saves':
+        return {
+          status: 200,
+          body: await this.#useCases.listSaves.execute(),
+        };
+      case 'POST /api/save':
+        return this.#save(body);
+      case 'POST /api/load':
+        return this.#load(body);
       default:
         return NOT_FOUND;
     }
@@ -160,6 +182,49 @@ export class SimulationController {
     return { status: 200, body: result };
   }
 
+  // RN28
+  async #upgrade(id: number, body: unknown): Promise<ApiResponse> {
+    const upgrade = field(body, 'upgrade');
+    if (upgrade === undefined) {
+      return error(400, 'Envie {"upgrade": "pickaxe"}');
+    }
+    const result = await this.#useCases.upgradeRobot.execute(id, upgrade);
+    if (!result.ok) {
+      return {
+        status: result.error === 'UNKNOWN_ROBOT' ? 404 : 400,
+        body: result,
+      };
+    }
+    await this.#notify([]);
+    return { status: 200, body: result };
+  }
+
+  // RN30
+  async #save(body: unknown): Promise<ApiResponse> {
+    const name = field(body, 'name');
+    if (name === undefined) {
+      return error(400, 'Envie {"name": "partida1"}');
+    }
+    const result = await this.#useCases.saveGame.execute(name);
+    return { status: result.ok ? 200 : 400, body: result };
+  }
+
+  async #load(body: unknown): Promise<ApiResponse> {
+    const name = field(body, 'name');
+    if (name === undefined) {
+      return error(400, 'Envie {"name": "partida1"}');
+    }
+    const result = await this.#useCases.loadGame.execute(name);
+    if (!result.ok) {
+      return {
+        status: result.error === 'NOT_FOUND' ? 404 : 400,
+        body: result,
+      };
+    }
+    await this.#notify([]);
+    return { status: 200, body: result };
+  }
+
   async #speed(body: unknown): Promise<ApiResponse> {
     const value =
       typeof body === 'object' && body !== null && 'ticksPerSecond' in body
@@ -178,13 +243,12 @@ export class SimulationController {
     return { status: 200, body: this.clock.toDTO() };
   }
 
-  // Avança e avisa. Pelo relógio, sem nenhum robô rodando, não avisa nada.
-  async #advance(ticks: number, always: boolean): Promise<void> {
-    const { advanced, events } =
-      await this.#useCases.advanceClock.execute(ticks);
-    if (advanced > 0 || always) {
-      await this.#notify(events);
-    }
+  // Avança e avisa. O mundo anda mesmo sem robô rodando (RN26, RN27).
+  async #advance(ticks: number): Promise<void> {
+    const { events } = await this.#useCases.advanceClock.execute(ticks, {
+      untilIdle: false,
+    });
+    await this.#notify(events);
   }
 
   async #notify(events: EventDTO[]): Promise<void> {

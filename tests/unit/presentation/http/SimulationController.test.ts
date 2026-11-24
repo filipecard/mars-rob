@@ -201,7 +201,7 @@ describe('SimulationController — relógio', () => {
     },
   );
 
-  it('tocando, cada intervalo avança 1 tick; sem programa não avisa', async () => {
+  it('tocando, cada intervalo avança 1 tick e avisa, mesmo sem programa (o mundo anda)', async () => {
     const timers = manualTimers();
     const api = controller(timers);
     const updates = collect(api);
@@ -220,7 +220,8 @@ describe('SimulationController — relógio', () => {
     timers.fire();
     await flush();
 
-    // tick 1: andou; tick 2: terminou; depois disso, nada
-    expect(updates.slice(before).map((u) => u.state.tick)).toEqual([1, 2]);
+    // tick 1: andou; tick 2: terminou; tick 3: só o mundo
+    expect(updates.slice(before).map((u) => u.state.tick)).toEqual([1, 2, 3]);
+    expect(updates.at(-1)?.events).toEqual([]);
   });
 });

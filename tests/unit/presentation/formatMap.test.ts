@@ -13,6 +13,8 @@ const around: CellDTO[] = [-1, 0, 1].flatMap((x) =>
     y,
     blocked: x === 1 && y === 1,
     visited: x === 0 && y === 0,
+    ground: x === 1 && y === 1 ? ('rock' as const) : ('free' as const),
+    item: null,
   })),
 );
 
@@ -22,6 +24,8 @@ const base: MapDTO = {
   explored: around,
   robot: { id: 1, x: 0, y: 0, orientation: 'N' },
   others: [],
+  base: { x: 0, y: 0 },
+  visionRange: 1,
 };
 
 describe('formatMap', () => {
@@ -81,11 +85,14 @@ describe('formatMapView', () => {
       robot: { ...base.robot, id: 2 },
     }).split('\n');
 
-    expect(lines).toHaveLength(8);
+    expect(lines).toHaveLength(9);
     expect(lines[0]).toBe('Mapa do robô 2');
     expect(lines[6]).toBe('Explorado: 9 de 25 casas');
     expect(lines[7]).toBe(
-      'Legenda: ^ > v < robô 2 (para onde olha)   número outro robô   # obstáculo   . livre   ? desconhecido',
+      'Legenda: ^ > v < robô 2 (para onde olha)   número outro robô   ? desconhecido   . livre',
+    );
+    expect(lines[8]).toBe(
+      '         B base   # rocha   T árvore   $ jazida   , galho   o pedra   = tronco   % ferro',
     );
   });
 });

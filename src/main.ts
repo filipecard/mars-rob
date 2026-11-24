@@ -9,16 +9,24 @@ import { DescribeSimulation } from './application/use-cases/DescribeSimulation.j
 import { ExecuteOrders } from './application/use-cases/ExecuteOrders.js';
 import { LoadScript } from './application/use-cases/LoadScript.js';
 import { ForgetMap } from './application/use-cases/ForgetMap.js';
+import {
+  ListSaves,
+  LoadGame,
+  SaveGame,
+} from './application/use-cases/SaveGame.js';
 import { StopProgram } from './application/use-cases/StopProgram.js';
+import { UpgradeRobot } from './application/use-cases/UpgradeRobot.js';
 import { Fleet } from './domain/entities/Fleet.js';
 import { Simulation } from './domain/simulation/Simulation.js';
 import { generateGrid } from './domain/services/generateGrid.js';
+import { World } from './domain/world/World.js';
 import { loadConfig } from './infrastructure/config/AppConfig.js';
 import {
   randomSeed,
   seededRandom,
 } from './infrastructure/random/seededRandom.js';
 import { InMemorySimulationRepository } from './infrastructure/repositories/InMemorySimulationRepository.js';
+import { JsonFileSaveStore } from './infrastructure/saves/JsonFileSaveStore.js';
 import { formatWelcome } from './presentation/cli/formatWelcome.js';
 import { parseCliArgs } from './presentation/cli/parseCliArgs.js';
 import { runCli } from './presentation/cli/runCli.js';
@@ -45,18 +53,23 @@ const { config } = loaded;
 const seed = config.seed ?? randomSeed();
 let fleet: Fleet;
 try {
-  // A mesma semente sorteia os obstáculos e depois onde os robôs nascem
+  // A mesma semente sorteia as rochas, o mundo (pedras, árvores, jazidas) e onde os
+  // robôs nascem; depois continua sorteando o que nasce no mundo a cada tick
   const random = seededRandom(seed);
-  fleet = Fleet.create(
+  const world = World.create(
     generateGrid(config.limit, config.obstacles, random),
-    config.robots,
+    config.world,
     random,
   );
+  fleet = Fleet.create(world, config.robots, random, config.robot);
 } catch (error) {
   exitWithError(`Configuração inválida: ${(error as Error).message}`);
 }
 
-const repository = new InMemorySimulationRepository(new Simulation(fleet));
+const repository = new InMemorySimulationRepository(
+  new Simulation(fleet, { seed }),
+);
+const saves = new JsonFileSaveStore();
 const useCases = {
   executeOrders: new ExecuteOrders(repository),
   describeFleet: new DescribeFleet(repository),
@@ -66,6 +79,10 @@ const useCases = {
   advanceClock: new AdvanceClock(repository),
   stopProgram: new StopProgram(repository),
   forgetMap: new ForgetMap(repository),
+  upgradeRobot: new UpgradeRobot(repository),
+  saveGame: new SaveGame(repository, saves),
+  loadGame: new LoadGame(repository, saves, seededRandom),
+  listSaves: new ListSaves(saves),
 };
 
 const welcome = formatWelcome(await useCases.describeFleet.execute(), seed);

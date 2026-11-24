@@ -28,6 +28,31 @@ describe('parseConfig', () => {
         robots: 3,
         obstacles: { count: 6, maxSize: 3 },
         seed: 42,
+        robot: DEFAULT_CONFIG.robot,
+        world: DEFAULT_CONFIG.world,
+      },
+    });
+  });
+
+  it('lê bateria, armazenamento e mundo — RN24, RN25, RN26', () => {
+    const result = parseConfig({
+      bateria: { maxima: 150, recargaPorTick: 10, solarACadaTicks: 0 },
+      armazenamento: { robo: 12, armazem: 80 },
+      mundo: { pedras: 5, arvoresIniciais: 0, vidaDaArvore: 0 },
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      config: {
+        robot: { battery: 150, rechargeRate: 10, solarEvery: 0, cargo: 12 },
+        world: {
+          warehouse: 80,
+          stones: 5,
+          initialTrees: 0,
+          treeLifespan: 0,
+          // o que não veio fica no padrão
+          oreUses: DEFAULT_CONFIG.world.oreUses,
+        },
       },
     });
   });
@@ -45,7 +70,7 @@ describe('parseConfig', () => {
   it('completa com o padrão o que faltar', () => {
     expect(parseConfig({ obstaculos: { quantidade: 2 } })).toEqual({
       ok: true,
-      config: { ...DEFAULT_CONFIG, obstacles: { count: 2, maxSize: 4 } },
+      config: { ...DEFAULT_CONFIG, obstacles: { count: 2, maxSize: 8 } },
     });
   });
 
@@ -64,8 +89,8 @@ describe('parseConfig', () => {
     [{ limite: 0 }, '"limite"'],
     [{ limite: '15' }, '"limite"'],
     [{ limite: 2.5 }, '"limite"'],
-    [{ robos: 0 }, '"robos" deve ser um inteiro de 1 a 5'],
-    [{ robos: 6 }, '"robos"'],
+    [{ robos: 0 }, '"robos" deve ser um inteiro de 1 a 10'],
+    [{ robos: 11 }, '"robos"'],
     [
       { limite: 17, robos: 6 },
       'de 1 a 5 (1 robô a cada 3 de limite; o limite é 17)',
@@ -77,6 +102,10 @@ describe('parseConfig', () => {
     [{ semente: -1 }, '"semente"'],
     [{ semente: 2 ** 32 }, '"semente"'],
     [{ semente: 'abc' }, '"semente"'],
+    [{ bateria: 3 }, '"bateria" deve ser um objeto'],
+    [{ bateria: { maxima: 0 } }, '"bateria.maxima" deve ser um inteiro maior ou igual a 1'],
+    [{ mundo: { pedras: -1 } }, '"mundo.pedras"'],
+    [{ armazenamento: { robo: 1.5 } }, '"armazenamento.robo"'],
   ])('rejeita %j', (raw, text) => {
     const result = parseConfig(raw);
 

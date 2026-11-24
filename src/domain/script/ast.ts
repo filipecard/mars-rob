@@ -14,6 +14,7 @@ export type Expression =
   | (Node & { kind: 'string'; value: string })
   | (Node & { kind: 'boolean'; value: boolean })
   | (Node & { kind: 'null' })
+  | (Node & { kind: 'this' })
   | (Node & { kind: 'identifier'; name: string })
   | (Node & { kind: 'list'; items: Expression[] })
   | (Node & { kind: 'unary'; operator: '!' | '-'; operand: Expression })
@@ -30,6 +31,7 @@ export type Expression =
       right: Expression;
     })
   | (Node & { kind: 'call'; callee: Expression; args: Expression[] })
+  | (Node & { kind: 'new'; callee: Expression; args: Expression[] })
   | (Node & { kind: 'member'; object: Expression; property: string })
   | (Node & { kind: 'index'; object: Expression; index: Expression });
 
@@ -78,9 +80,22 @@ export type Statement =
       params: string[];
       body: Statement[];
     })
+  | (Node & {
+      kind: 'class';
+      name: string;
+      methods: MethodDeclaration[];
+    })
   | (Node & { kind: 'return'; value: Expression | null })
   | (Node & { kind: 'break' })
   | (Node & { kind: 'continue' });
+
+// Método de uma classe ("constructor" é o que roda no new)
+export interface MethodDeclaration {
+  name: string;
+  params: string[];
+  body: Statement[];
+  location: SourceLocation;
+}
 
 export interface Program {
   body: Statement[];

@@ -41,11 +41,11 @@ const positionOf = (sim: Simulation, id: number): string => {
 };
 
 describe('Simulation — relógio — RN17', () => {
-  it('sem programas, avançar não faz nada e o tick não conta', () => {
+  it('sem programas, o tick conta (o mundo anda), mas nenhum robô faz nada', () => {
     const sim = simulation();
 
     expect(sim.advance()).toEqual([]);
-    expect(sim.tick).toBe(0);
+    expect(sim.tick).toBe(1);
     expect(sim.idle).toBe(true);
   });
 

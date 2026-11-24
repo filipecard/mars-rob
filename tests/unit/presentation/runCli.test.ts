@@ -5,7 +5,15 @@ import { DescribeSimulation } from '../../../src/application/use-cases/DescribeS
 import { ExecuteOrders } from '../../../src/application/use-cases/ExecuteOrders.js';
 import { LoadScript } from '../../../src/application/use-cases/LoadScript.js';
 import { ForgetMap } from '../../../src/application/use-cases/ForgetMap.js';
+import {
+  ListSaves,
+  LoadGame,
+  SaveGame,
+} from '../../../src/application/use-cases/SaveGame.js';
 import { StopProgram } from '../../../src/application/use-cases/StopProgram.js';
+import { UpgradeRobot } from '../../../src/application/use-cases/UpgradeRobot.js';
+import { seededRandom } from '../../../src/infrastructure/random/seededRandom.js';
+import { MemorySaveStore } from '../application/MemorySaveStore.js';
 import { Fleet, type Placement } from '../../../src/domain/entities/Fleet.js';
 import { Grid } from '../../../src/domain/value-objects/Grid.js';
 import { Obstacle } from '../../../src/domain/value-objects/Obstacle.js';
@@ -31,6 +39,7 @@ async function run(
   prompts: CliMode[] = [],
 ): Promise<string[]> {
   const repository = InMemorySimulationRepository.of(fleet);
+  const saves = new MemorySaveStore();
   const output: string[] = [];
   const useCases = {
     executeOrders: new ExecuteOrders(repository),
@@ -40,6 +49,10 @@ async function run(
     advanceClock: new AdvanceClock(repository),
     stopProgram: new StopProgram(repository),
     forgetMap: new ForgetMap(repository),
+    upgradeRobot: new UpgradeRobot(repository),
+    saveGame: new SaveGame(repository, saves),
+    loadGame: new LoadGame(repository, saves, seededRandom),
+    listSaves: new ListSaves(saves),
   };
   await runCli(useCases, toAsyncIterable(lines), {
     print: (text) => {
@@ -59,8 +72,10 @@ async function* toAsyncIterable(lines: string[]): AsyncGenerator<string> {
   }
 }
 
-const LEGEND =
-  'Legenda: ^ > v < robô 1 (para onde olha)   número outro robô   # obstáculo   . livre   ? desconhecido';
+const LEGEND = [
+  'Legenda: ^ > v < robô 1 (para onde olha)   número outro robô   ? desconhecido   . livre',
+  '         B base   # rocha   T árvore   $ jazida   , galho   o pedra   = tronco   % ferro',
+].join('\n');
 
 describe('runCli — ordens', () => {
   it('imprime a posição após cada ordem válida', async () => {
@@ -206,7 +221,8 @@ describe('runCli — mapa', () => {
       '? ? ? ? ? ? ?',
       '? ? ? ? ? ? ?',
       '? ? . . . . .',
-      '? ? . . . ^ .',
+      // RN23: a base (B) na origem
+      '? ? . B . ^ .',
       '? ? . . . . .',
       '? ? ? ? ? ? ?',
       '? ? ? ? ? ? ?',
@@ -314,10 +330,12 @@ describe('runCli — scripts e relógio — RN17, RN18', () => {
       ].join('\n'),
       [
         'Robô 1: posição atual (X: 0, Y: 0) para o Sul',
+        'Avançou 2 ticks; agora é o tick 1002.',
         'Ainda rodando: robô 1. Use "ticks N" para avançar ou "parar ID" para parar.',
       ].join('\n'),
       'Robô 1: programa parado',
-      'Nenhum robô está rodando programa',
+      // sem robô rodando, o relógio anda do mesmo jeito (o mundo vive)
+      'Avançou 5 ticks; agora é o tick 1007.',
     ]);
   });
 

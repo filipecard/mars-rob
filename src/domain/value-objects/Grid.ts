@@ -1,9 +1,11 @@
+import type { CellSnapshot, Terrain } from '../world/Terrain.js';
 import { keyOf, sideNeighbors, type Obstacle } from './Obstacle.js';
 import { Position } from './Position.js';
 
 export const STANDARD_LIMIT = 15;
 
-export class Grid {
+// A malha fixa: limites e rochas (obstáculos que nunca mudam)
+export class Grid implements Terrain {
   readonly min: number;
   readonly max: number;
   readonly obstacles: readonly Obstacle[];
@@ -76,6 +78,10 @@ export class Grid {
   // RN09
   isBlocked(position: Position): boolean {
     return this.#blocked.has(keyOf(position));
+  }
+
+  describe(position: Position): CellSnapshot {
+    return { ground: this.isBlocked(position) ? 'rock' : 'free', item: null };
   }
 }
 

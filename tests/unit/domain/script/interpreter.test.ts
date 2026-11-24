@@ -92,6 +92,9 @@ describe('ScriptProcess — ações e ticks', () => {
               robot: null,
               visited: false,
               unknownAround: 0,
+              item: null,
+              obstacle: null,
+              isBase: false,
             };
           }
           return true;
@@ -283,6 +286,9 @@ describe('ScriptProcess — sensores', () => {
         robot: 2,
         visited: false,
         unknownAround: 0,
+        item: null,
+        obstacle: null,
+        isBase: false,
       },
       back: {
         type: 'edge',
@@ -291,6 +297,9 @@ describe('ScriptProcess — sensores', () => {
         robot: null,
         visited: false,
         unknownAround: 0,
+        item: null,
+        obstacle: null,
+        isBase: false,
       },
       left: {
         type: 'obstacle',
@@ -299,6 +308,9 @@ describe('ScriptProcess — sensores', () => {
         robot: null,
         visited: false,
         unknownAround: 0,
+        item: null,
+        obstacle: null,
+        isBase: false,
       },
     };
 
@@ -344,8 +356,21 @@ describe('ScriptProcess — sensores', () => {
         robot: null,
         visited: false,
         unknownAround: 0,
+        item: null,
+        obstacle: null,
+        isBase: false,
       },
-      { type: 'robot', x: 1, y: 1, robot: 3, visited: false, unknownAround: 0 },
+      {
+        type: 'robot',
+        x: 1,
+        y: 1,
+        robot: 3,
+        visited: false,
+        unknownAround: 0,
+        item: null,
+        obstacle: null,
+        isBase: false,
+      },
     ];
 
     const { host: after } = runScript(
@@ -371,6 +396,9 @@ describe('ScriptProcess — sensores', () => {
         robot: null,
         visited: true,
         unknownAround: 3,
+        item: null,
+        obstacle: null,
+        isBase: false,
       },
     };
 
@@ -417,7 +445,11 @@ describe('ScriptProcess — erros de execução', () => {
       'print(1 < "2")',
       /compara dois números ou dois textos/,
     ],
-    ['chamar o que não é função', 'let x = 1\nx()', /number não é uma função/],
+    [
+      'chamar o que não é função',
+      'let x = 1\nx()',
+      /"x" não é uma função \(é number\)/,
+    ],
     ['argumentos a mais na nativa', 'forward(1)', /forward espera 0 argumento/],
     ['argumentos a menos na nativa', 'cellAt(1)', /cellAt espera 2 argumento/],
     [
@@ -477,6 +509,9 @@ describe('ScriptProcess — nearestUnknown — RN22', () => {
       robot: null,
       visited: false,
       unknownAround: 3,
+      item: null,
+      obstacle: null,
+      isBase: false,
     };
 
     const found = runScript(
@@ -530,5 +565,169 @@ describe('ScriptProcess — goTo — RN21', () => {
 
   it('as coordenadas precisam ser inteiras', () => {
     expect(runtimeError('goTo(1.5, 2)').reason).toContain('inteiro');
+  });
+});
+
+describe('ScriptProcess — igualdade por valor', () => {
+  it('CA86 — posições e casas comparam pelos campos', () => {
+    expect(
+      printed(
+        'print(self.position == cellAt(0, 0).position, cellAt(1, 2) == cellAt(1, 2), cellAt(1, 2).position != cellAt(2, 1).position)',
+      ),
+    ).toEqual(['true true true']);
+  });
+
+  it('listas continuam comparando pela identidade; includes acha posição igual', () => {
+    expect(
+      printed(
+        'let l = [1]\nprint(l == l, [1] == [1], [cellAt(3, 4).position].includes(cellAt(3, 4).position))',
+      ),
+    ).toEqual(['true false true']);
+  });
+});
+
+describe('ScriptProcess — mensagens de erro melhores — CA88', () => {
+  it.each([
+    [
+      'campo chamado como função',
+      'front().isEmpty()',
+      '"isEmpty" é um campo, não uma função: use front().isEmpty, sem os parênteses',
+    ],
+    [
+      'nome parecido com uma variável',
+      'let passos = 1\nprint(paso)',
+      '"paso" não foi declarado. Você quis dizer "passos"?',
+    ],
+    [
+      'nome parecido com uma função da linguagem',
+      'fordward()',
+      '"fordward" não foi declarado. Você quis dizer "forward"?',
+    ],
+    [
+      'maiúsculas trocadas',
+      'Print(1)',
+      '"Print" não foi declarado. Você quis dizer "print"?',
+    ],
+    [
+      'campo parecido',
+      'print(front().isEmty)',
+      'cell não tem a propriedade "isEmty". Você quis dizer "isEmpty"?',
+    ],
+    ['nome sem nada parecido', 'print(xyzw)', '"xyzw" não foi declarado'],
+  ])('%s', (_name, source, message) => {
+    expect(runtimeError(source).reason).toBe(message);
+  });
+});
+
+describe('ScriptProcess — classes', () => {
+  it('CA87 — constructor, campos em this e métodos', () => {
+    expect(
+      printed(`
+        class Contador {
+          constructor(inicio) { this.n = inicio }
+          mais(k) { this.n += k; return this }
+          valor() { return this.n }
+        }
+        let c = new Contador(2)
+        c.mais(3).mais(1)
+        c.n++
+        print(c.valor(), c, type(c))
+      `),
+    ).toEqual(['7 Contador { n: 7 } Contador']);
+  });
+
+  it('cada objeto tem os próprios campos; comparação pela identidade', () => {
+    expect(
+      printed(`
+        class P { constructor(x) { this.x = x } }
+        let a = new P(1)
+        let b = new P(1)
+        b.x = 5
+        print(a.x, b.x, a == a, a == b)
+      `),
+    ).toEqual(['1 5 true false']);
+  });
+
+  it('métodos podem fazer ações (gastam tick) e usar self', () => {
+    const { actions, host } = runScript(`
+      class Andarilho {
+        constructor() { this.passos = 0 }
+        andar(n) {
+          for (let i = 0; i < n; i++) { if (forward()) this.passos++ }
+          return self.id
+        }
+      }
+      let a = new Andarilho()
+      print(a.andar(3), a.passos)
+    `);
+
+    expect(kinds(actions)).toEqual(['forward', 'forward', 'forward']);
+    expect(host.printed).toEqual(['1 3']);
+  });
+
+  it('classe sem constructor; pode ser usada antes de declarada; funções internas veem this', () => {
+    expect(
+      printed(`
+        let v = new Vazio()
+        v.nome = "oi"
+        print(v.dobro())
+        class Vazio {
+          dobro() {
+            function dentro() { return this.nome + this.nome }
+            return dentro()
+          }
+        }
+      `),
+    ).toEqual(['oioi']);
+  });
+
+  it('um método lido sem chamar continua ligado ao objeto', () => {
+    expect(
+      printed(`
+        class A { constructor() { this.v = 9 } ver() { return this.v } }
+        let f = new A().ver
+        print(f())
+      `),
+    ).toEqual(['9']);
+  });
+
+  it.each([
+    [
+      'chamar a classe sem new',
+      'class A {}\nA()',
+      'para criar um A, use new A(...)',
+    ],
+    [
+      'new em algo que não é classe',
+      'let x = 1\nnew x()',
+      '"new" precisa de uma classe, recebeu number',
+    ],
+    [
+      'argumentos sem constructor',
+      'class A {}\nnew A(1)',
+      'A não tem constructor, então não recebe argumentos',
+    ],
+    [
+      'argumentos a menos no constructor',
+      'class A { constructor(x) {} }\nnew A()',
+      'A.constructor espera 1 argumento(s), recebeu 0',
+    ],
+    [
+      'campo que não existe',
+      'class A { constructor() { this.vida = 1 } }\nprint(new A().vid)',
+      'A não tem a propriedade "vid". Você quis dizer "vida"?',
+    ],
+    [
+      'campo em casa continua só de leitura',
+      'front().type = "x"',
+      'a propriedade "type" é só de leitura',
+    ],
+    [
+      'campo em número',
+      'let n = 1\nn.x = 2',
+      'não dá para criar a propriedade "x" em number',
+    ],
+  ])('%s', (_name, source, message) => {
+    expect(runtimeError(source).reason).toBe(message);
   });
 });

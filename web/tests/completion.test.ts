@@ -139,6 +139,12 @@ describe('declaredNames', () => {
       { name: 'y', isFunction: false },
     ]);
   });
+
+  it('classes entram como função (para completar new Nome())', () => {
+    expect(declaredNames('class Andarilho { andar() {} }')).toEqual([
+      { name: 'Andarilho', isFunction: true },
+    ]);
+  });
 });
 
 describe('lineAndColumn', () => {

@@ -41,6 +41,9 @@ describe('FleetRobotHost — RN18', () => {
       visited: false,
       // (−1,2), (0,2) e (1,2) ainda não foram vistas
       unknownAround: 3,
+      item: null,
+      obstacle: 'rock',
+      isBase: false,
     });
     expect(host.look('right')).toMatchObject({
       type: 'robot',
@@ -96,6 +99,9 @@ describe('FleetRobotHost — RN18', () => {
       visited: false,
       // canto da malha: só (2,2), (2,3), (3,2) e (3,3) existem, todas desconhecidas
       unknownAround: 4,
+      item: null,
+      obstacle: null,
+      isBase: false,
     });
     expect(host.cellAt(9, 9)).toEqual({
       type: 'edge',
@@ -104,6 +110,9 @@ describe('FleetRobotHost — RN18', () => {
       robot: null,
       visited: false,
       unknownAround: 0,
+      item: null,
+      obstacle: null,
+      isBase: false,
     });
   });
 

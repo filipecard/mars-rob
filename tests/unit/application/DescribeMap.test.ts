@@ -56,6 +56,9 @@ describe('DescribeMap', () => {
         blocked: x === 2 && y === 1,
         // RN19: só a origem e (1,0) foram pisadas
         visited: y === 0 && (x === 0 || x === 1),
+        // RN23: a base fica na origem
+        ground: x === 2 && y === 1 ? 'rock' : x === 0 && y === 0 ? 'base' : 'free',
+        item: null,
       })),
     );
     expect(result.ok && sortCells(result.map.explored)).toEqual(
@@ -63,7 +66,13 @@ describe('DescribeMap', () => {
     );
     expect(result).toMatchObject({
       ok: true,
-      map: { min: -3, max: 3, robot: { id: 1, x: 1, y: 0 } },
+      map: {
+        min: -3,
+        max: 3,
+        robot: { id: 1, x: 1, y: 0 },
+        base: { x: 0, y: 0 },
+        visionRange: 1,
+      },
     });
   });
 

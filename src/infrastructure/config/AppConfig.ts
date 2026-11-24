@@ -1,5 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import { maxRobots } from '../../domain/entities/Fleet.js';
+import {
+  DEFAULT_ROBOT_SETTINGS,
+  type RobotSettings,
+} from '../../domain/entities/Robot.js';
+import {
+  DEFAULT_WORLD_SETTINGS,
+  type WorldSettings,
+} from '../../domain/world/World.js';
 import { MAX_SEED } from '../random/seededRandom.js';
 
 export const DEFAULT_CONFIG_PATH = 'mars-rob.config.json';
@@ -11,28 +19,71 @@ export interface AppConfig {
   obstacles: { count: number; maxSize: number };
   // null: sorteia uma semente nova a cada execução
   seed: number | null;
+  // RN24, RN25
+  robot: RobotSettings;
+  // RN23, RN25–RN27
+  world: WorldSettings;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
-  limit: 15,
+  limit: 30,
   robots: 1,
-  obstacles: { count: 4, maxSize: 4 },
+  obstacles: { count: 20, maxSize: 8 },
   seed: null,
+  robot: DEFAULT_ROBOT_SETTINGS,
+  world: DEFAULT_WORLD_SETTINGS,
 };
 
 export type ConfigResult =
   { ok: true; config: AppConfig } | { ok: false; message: string };
 
+// Cada número de uma seção: [caminho no arquivo, valor mínimo]
+type Fields<T> = Readonly<Record<keyof T & string, readonly [string, number]>>;
+
+const ROBOT_FIELDS: Fields<RobotSettings> = {
+  battery: ['bateria.maxima', 1],
+  rechargeRate: ['bateria.recargaPorTick', 1],
+  solarEvery: ['bateria.solarACadaTicks', 0],
+  cargo: ['armazenamento.robo', 1],
+};
+
+const WORLD_FIELDS: Fields<WorldSettings> = {
+  warehouse: ['armazenamento.armazem', 1],
+  stones: ['mundo.pedras', 0],
+  initialTrees: ['mundo.arvoresIniciais', 0],
+  initialOres: ['mundo.minerios', 0],
+  treeEvery: ['mundo.novaArvoreACadaTicks', 0],
+  oreEvery: ['mundo.novoMinerioACadaTicks', 0],
+  maxTrees: ['mundo.maxArvores', 0],
+  maxOres: ['mundo.maxMinerios', 0],
+  treeGrowEvery: ['mundo.arvoreCresceACadaTicks', 0],
+  treeMaxCells: ['mundo.tamanhoMaximoArvore', 1],
+  branchEvery: ['mundo.galhoACadaTicks', 0],
+  treeLifespan: ['mundo.vidaDaArvore', 0],
+  oreUses: ['mundo.usosDoMinerio', 1],
+};
+
+const SECTIONS = ['obstaculos', 'bateria', 'armazenamento', 'mundo'];
+
 // Formato do arquivo (todas as chaves são opcionais; o que faltar usa o padrão):
-// { "limite": 15, "robos": 1, "obstaculos": { "quantidade": 4, "tamanhoMaximo": 4 }, "semente": null }
+// {
+//   "limite": 30, "robos": 1, "obstaculos": { "quantidade": 20, "tamanhoMaximo": 8 },
+//   "semente": null,
+//   "bateria": { "maxima": 100, "recargaPorTick": 20, "solarACadaTicks": 5 },
+//   "armazenamento": { "robo": 10, "armazem": 50 },
+//   "mundo": { "pedras": 40, "arvoresIniciais": 10, "minerios": 6, ... }
+// }
 export function parseConfig(raw: unknown): ConfigResult {
   if (!isObject(raw)) {
     return fail('a configuração deve ser um objeto JSON');
   }
-  const obstacles = raw['obstaculos'] ?? {};
-  if (!isObject(obstacles)) {
-    return fail('"obstaculos" deve ser um objeto');
+  const badSection = SECTIONS.find(
+    (section) => raw[section] !== undefined && !isObject(raw[section]),
+  );
+  if (badSection !== undefined) {
+    return fail(`"${badSection}" deve ser um objeto`);
   }
+  const obstacles = (raw['obstaculos'] ?? {}) as Record<string, unknown>;
 
   const limit = readInteger(raw['limite'], DEFAULT_CONFIG.limit, 1);
   if (limit === undefined) {
@@ -74,11 +125,42 @@ export function parseConfig(raw: unknown): ConfigResult {
       `"semente" deve ser null ou um inteiro de 0 a ${String(MAX_SEED)}`,
     );
   }
+  const robot = readFields(raw, ROBOT_FIELDS, DEFAULT_ROBOT_SETTINGS);
+  if (typeof robot === 'string') {
+    return fail(robot);
+  }
+  const world = readFields(raw, WORLD_FIELDS, DEFAULT_WORLD_SETTINGS);
+  if (typeof world === 'string') {
+    return fail(world);
+  }
 
   return {
     ok: true,
-    config: { limit, robots, obstacles: { count, maxSize }, seed },
+    config: { limit, robots, obstacles: { count, maxSize }, seed, robot, world },
   };
+}
+
+// Lê cada "secao.chave"; devolve a mensagem de erro do primeiro valor inválido
+function readFields<T extends object>(
+  raw: Record<string, unknown>,
+  fields: Fields<T>,
+  defaults: T,
+): T | string {
+  const result: Record<string, number> = { ...defaults } as Record<
+    string,
+    number
+  >;
+  const entries: [string, readonly [string, number]][] = Object.entries(fields);
+  for (const [field, [path, min]] of entries) {
+    const [section = '', key = ''] = path.split('.');
+    const values = (raw[section] ?? {}) as Record<string, unknown>;
+    const value = readInteger(values[key], result[field] ?? 0, min);
+    if (value === undefined) {
+      return `"${path}" deve ser um inteiro maior ou igual a ${String(min)}`;
+    }
+    result[field] = value;
+  }
+  return result as T;
 }
 
 // Lê o arquivo. Se o caminho não foi informado e o arquivo padrão não existe, usa o padrão.

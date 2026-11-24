@@ -4,8 +4,12 @@ import type {
   RobotHost,
   SelfInfo,
   Side,
+  StatusInfo,
   StepKind,
+  StorageInfo,
 } from '../../../../src/domain/script/host.js';
+import type { ItemKind } from '../../../../src/domain/world/Item.js';
+import type { UpgradeKind } from '../../../../src/domain/world/Upgrade.js';
 import {
   ScriptProcess,
   type ProcessStep,
@@ -21,6 +25,24 @@ export class FakeHost implements RobotHost {
   path: StepKind[] | null = [];
   pathRequests: [number, number][] = [];
   frontier: CellInfo | null = null;
+  nextToPath: StepKind[] | null = [];
+  itemFound: CellInfo | null = null;
+  itemRequests: (ItemKind | null)[] = [];
+  oreFound: CellInfo | null = null;
+  statusInfo: StatusInfo = {
+    battery: 80,
+    maxBattery: 100,
+    cargo: 3,
+    maxCargo: 10,
+    inventory: ['branch', 'stone'],
+    levels: { pickaxe: 1, battery: 0, cargo: 0, vision: 0, warehouse: 2 },
+  };
+  storage: StorageInfo = {
+    items: { branch: 2, stone: 0, log: 1, iron: 0 },
+    used: 6,
+    capacity: 50,
+  };
+  upgradable = new Set<UpgradeKind>(['battery']);
 
   self(): SelfInfo {
     return { ...this.state };
@@ -35,6 +57,9 @@ export class FakeHost implements RobotHost {
         robot: null,
         visited: false,
         unknownAround: 0,
+        item: null,
+        obstacle: null,
+        isBase: false,
       }
     );
   }
@@ -51,6 +76,9 @@ export class FakeHost implements RobotHost {
       robot: null,
       visited: false,
       unknownAround: 0,
+      item: null,
+      obstacle: null,
+      isBase: false,
     };
   }
 
@@ -65,6 +93,36 @@ export class FakeHost implements RobotHost {
 
   nearestUnknown(): CellInfo | null {
     return this.frontier;
+  }
+
+  pathNextTo(x: number, y: number): StepKind[] | null {
+    this.pathRequests.push([x, y]);
+    return this.nextToPath;
+  }
+
+  nearestItem(kind: ItemKind | null): CellInfo | null {
+    this.itemRequests.push(kind);
+    return this.itemFound;
+  }
+
+  nearestOre(): CellInfo | null {
+    return this.oreFound;
+  }
+
+  status(): StatusInfo {
+    return this.statusInfo;
+  }
+
+  base(): { x: number; y: number } {
+    return { x: 0, y: 0 };
+  }
+
+  warehouse(): StorageInfo {
+    return this.storage;
+  }
+
+  canUpgrade(kind: UpgradeKind): boolean {
+    return this.upgradable.has(kind);
   }
 
   print(text: string): void {

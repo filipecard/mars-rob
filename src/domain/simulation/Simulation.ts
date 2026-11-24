@@ -1,4 +1,9 @@
-import type { Fleet } from '../entities/Fleet.js';
+import { Fleet } from '../entities/Fleet.js';
+import type {
+  Robot,
+  RobotSettings,
+  RobotSnapshot,
+} from '../entities/Robot.js';
 import { CollisionError } from '../errors/CollisionError.js';
 import { NotAdjacentError } from '../errors/NotAdjacentError.js';
 import { ObstacleError } from '../errors/ObstacleError.js';
@@ -6,9 +11,19 @@ import { OutOfGridError } from '../errors/OutOfGridError.js';
 import { UnknownRobotError } from '../errors/UnknownRobotError.js';
 import type { Action } from '../script/host.js';
 import { ScriptProcess } from '../script/interpreter.js';
+import { ScriptSyntaxError } from '../script/ScriptError.js';
+import type { Random } from '../services/random.js';
 import { Command } from '../value-objects/Command.js';
-import type { Orientation } from '../value-objects/Orientation.js';
+import { step } from '../value-objects/Direction.js';
+import { toAbsolute, type Orientation } from '../value-objects/Orientation.js';
 import type { Position } from '../value-objects/Position.js';
+import type { ItemKind } from '../world/Item.js';
+import {
+  purchaseUpgrade,
+  type UpgradeCheck,
+} from '../world/purchaseUpgrade.js';
+import type { UpgradeKind } from '../world/Upgrade.js';
+import { World, type WorldSnapshot } from '../world/World.js';
 import { FleetRobotHost } from './FleetRobotHost.js';
 import { OrderProgram, type Program } from './Program.js';
 
@@ -17,6 +32,26 @@ export type ProgramKind = Program['kind'];
 export type BlockReason = 'edge' | 'obstacle' | 'robot';
 
 export type ShareFailure = 'notAdjacent' | 'unknownRobot' | 'self';
+
+export type ActionKind = Action['kind'];
+
+// Por que uma ação (que não é andar nem compartilhar) não deu certo
+export type FailReason =
+  // RN24: carga insuficiente para a ação
+  | 'noBattery'
+  // RN23: só dá para fazer na base
+  | 'notAtBase'
+  // RN25/RN27: nada para pegar ou minerar
+  | 'nothing'
+  // RN25: não cabe no compartimento ou no armazém
+  | 'full'
+  // RN25: compartimento vazio
+  | 'empty'
+  // RN27: falta a picareta
+  | 'noTool'
+  // RN28
+  | 'maxLevel'
+  | 'missing';
 
 // O que aconteceu com um robô num tick
 export type SimulationEvent = { tick: number; robot: number } & (
@@ -34,6 +69,16 @@ export type SimulationEvent = { tick: number; robot: number } & (
   | { kind: 'shareFailed'; to: number; reason: ShareFailure }
   // RN20: quantas casas o robô deixou de conhecer
   | { kind: 'forgot'; forgotten: number }
+  // RN24
+  | { kind: 'recharged'; added: number; battery: number }
+  // RN25
+  | { kind: 'collected'; item: ItemKind }
+  | { kind: 'unloaded'; count: number }
+  // RN27
+  | { kind: 'mined'; item: ItemKind; at: Position; depleted: boolean }
+  // RN28
+  | { kind: 'upgraded'; upgrade: UpgradeKind; level: number }
+  | { kind: 'failed'; action: ActionKind; reason: FailReason }
   | { kind: 'printed'; text: string }
   | { kind: 'finished' }
   | { kind: 'error'; message: string; line: number; column: number }
@@ -56,24 +101,95 @@ const MOVES = {
 
 const TURNS = { turnRight: 'D', turnLeft: 'E' } as const;
 
+// RN24: carga gasta por ação (as que não aparecem não gastam)
+export const ACTION_COSTS: Readonly<Partial<Record<ActionKind, number>>> = {
+  forward: 1,
+  backward: 1,
+  stepRight: 1,
+  stepLeft: 1,
+  shareMap: 1,
+  collect: 1,
+  mine: 3,
+};
+
 interface Running {
   program: Program;
   lastActionSucceeded: boolean;
+  // RN30: o texto do script, para salvar
+  source: string | null;
 }
 
-// RN17: o relógio da frota. A cada tick, cada robô com programa executa no
-// máximo 1 ação, em ordem de ID. Sensores e contas do script não gastam tick.
+// RN30: tudo o que é preciso para continuar a simulação depois
+export interface SimulationSnapshot {
+  version: 1;
+  tick: number;
+  seed: number | null;
+  world: WorldSnapshot;
+  robotSettings: RobotSettings;
+  robots: RobotSnapshot[];
+  // Scripts que estavam rodando: recomeçam do início ao carregar
+  scripts: { robot: number; source: string }[];
+}
+
+// RN17: o relógio. A cada tick, cada robô com programa executa no máximo 1 ação,
+// em ordem de ID; depois o mundo anda (RN26, RN27) e os robôs atualizam a visão.
+// Sensores e contas do script não gastam tick.
 export class Simulation {
   readonly fleet: Fleet;
+  // A semente que gerou o mundo (null se não se sabe)
+  readonly seed: number | null;
   readonly #running = new Map<number, Running>();
   #tick = 0;
   #events: SimulationEvent[] = [];
 
-  constructor(fleet: Fleet) {
+  constructor(fleet: Fleet, { seed = null }: { seed?: number | null } = {}) {
     this.fleet = fleet;
+    this.seed = seed;
   }
 
-  // Quantos ticks já passaram. Só conta tick em que algum robô tinha programa.
+  // RN30: volta ao estado salvo. Scripts com erro de sintaxe ficam de fora.
+  static restore(snapshot: SimulationSnapshot, random: Random): Simulation {
+    const world = World.restore(snapshot.world, random);
+    const fleet = Fleet.restore(
+      world,
+      snapshot.robots,
+      snapshot.robotSettings,
+    );
+    const simulation = new Simulation(fleet, { seed: snapshot.seed });
+    simulation.#tick = snapshot.tick;
+    for (const { robot, source } of snapshot.scripts) {
+      try {
+        simulation.loadScript(robot, source);
+      } catch (error) {
+        if (!(error instanceof ScriptSyntaxError)) {
+          throw error;
+        }
+      }
+    }
+    return simulation;
+  }
+
+  snapshot(): SimulationSnapshot {
+    const [first] = this.fleet.robots;
+    return {
+      version: 1,
+      tick: this.#tick,
+      seed: this.seed,
+      world: this.world.snapshot(),
+      robotSettings: (first as Robot).settings,
+      robots: this.fleet.robots.map((robot) => robot.snapshot()),
+      scripts: this.running.flatMap((robot) => {
+        const source = this.#running.get(robot)?.source ?? null;
+        return source === null ? [] : [{ robot, source }];
+      }),
+    };
+  }
+
+  get world(): World {
+    return this.fleet.world;
+  }
+
+  // Quantos ticks já passaram
   get tick(): number {
     return this.#tick;
   }
@@ -100,10 +216,14 @@ export class Simulation {
       this.#emit(id, { kind: 'printed', text });
     });
     const process = ScriptProcess.compile(source, host);
-    this.#start(id, {
-      kind: 'script',
-      next: (lastActionSucceeded) => process.next(lastActionSucceeded),
-    });
+    this.#start(
+      id,
+      {
+        kind: 'script',
+        next: (lastActionSucceeded) => process.next(lastActionSucceeded),
+      },
+      source,
+    );
   }
 
   // RN17: uma ordem direta entra na fila do robô. Se ele estava rodando um
@@ -115,7 +235,7 @@ export class Simulation {
       current.append(actions);
       return;
     }
-    this.#start(id, new OrderProgram(actions));
+    this.#start(id, new OrderProgram(actions), null);
   }
 
   // Encerra o programa do robô; devolve se havia um
@@ -130,11 +250,13 @@ export class Simulation {
     return this.fleet.robot(id).forgetMap();
   }
 
-  // RN17: avança 1 tick e devolve o que aconteceu. Sem programas, não faz nada.
+  // RN28: o operador faz uma melhoria, fora dos ticks
+  upgrade(id: number, kind: UpgradeKind): UpgradeCheck {
+    return purchaseUpgrade(this.world, this.fleet.robot(id), kind);
+  }
+
+  // RN17: avança 1 tick e devolve o que aconteceu com os robôs
   advance(): SimulationEvent[] {
-    if (this.idle) {
-      return [];
-    }
     this.#tick++;
     this.#events = [];
     for (const id of this.running) {
@@ -161,19 +283,39 @@ export class Simulation {
           break;
       }
     }
+    // RN26, RN27: o mundo anda; nada cresce em cima de um robô
+    this.world.advance((position) => this.fleet.robotAt(position) !== undefined);
+    for (const robot of this.fleet.robots) {
+      robot.endTick();
+      robot.refreshView();
+    }
     return this.#events;
   }
 
-  #start(id: number, program: Program): void {
-    this.#running.set(id, { program, lastActionSucceeded: true });
+  #start(id: number, program: Program, source: string | null): void {
+    this.#running.set(id, { program, lastActionSucceeded: true, source });
   }
 
   #emit(robot: number, event: EventBody): void {
     this.#events.push({ tick: this.#tick, robot, ...event });
   }
 
-  // Aplica a ação e devolve se deu certo
+  // RN24: confere a carga, aplica a ação e só cobra se ela deu certo
   #apply(id: number, action: Action): boolean {
+    const robot = this.fleet.robot(id);
+    const cost = ACTION_COSTS[action.kind] ?? 0;
+    if (!robot.canAfford(cost)) {
+      this.#fail(id, action.kind, 'noBattery');
+      return false;
+    }
+    const succeeded = this.#perform(id, robot, action);
+    if (succeeded) {
+      robot.spend(cost);
+    }
+    return succeeded;
+  }
+
+  #perform(id: number, robot: Robot, action: Action): boolean {
     switch (action.kind) {
       case 'forward':
       case 'backward':
@@ -182,11 +324,11 @@ export class Simulation {
         return this.#move(id, MOVES[action.kind]);
       case 'turnRight':
       case 'turnLeft': {
-        const robot = this.fleet.move(id, Command.parse(TURNS[action.kind]));
+        const turned = this.fleet.move(id, Command.parse(TURNS[action.kind]));
         this.#emit(id, {
           kind: 'turned',
-          position: robot.position,
-          orientation: robot.orientation,
+          position: turned.position,
+          orientation: turned.orientation,
         });
         return true;
       }
@@ -196,11 +338,28 @@ export class Simulation {
       case 'shareMap':
         return this.#share(id, action.to);
       case 'forgetMap':
+        this.#emit(id, { kind: 'forgot', forgotten: robot.forgetMap() });
+        return true;
+      case 'recharge':
+        return this.#recharge(id, robot);
+      case 'collect':
+        return this.#collect(id, robot);
+      case 'unload':
+        return this.#unload(id, robot);
+      case 'mine':
+        return this.#mine(id, robot);
+      case 'upgrade': {
+        const result = purchaseUpgrade(this.world, robot, action.upgrade);
+        if (!result.ok) {
+          return this.#fail(id, 'upgrade', result.reason);
+        }
         this.#emit(id, {
-          kind: 'forgot',
-          forgotten: this.fleet.robot(id).forgetMap(),
+          kind: 'upgraded',
+          upgrade: action.upgrade,
+          level: result.level,
         });
         return true;
+      }
     }
   }
 
@@ -237,6 +396,12 @@ export class Simulation {
     this.#emit(id, { kind: 'blocked', reason, at, other });
   }
 
+  // Emite a falha e devolve false, para encerrar a ação numa linha
+  #fail(id: number, action: ActionKind, reason: FailReason): false {
+    this.#emit(id, { kind: 'failed', action, reason });
+    return false;
+  }
+
   // RN16
   #share(id: number, to: number): boolean {
     if (to === id) {
@@ -257,5 +422,74 @@ export class Simulation {
       }
       return false;
     }
+  }
+
+  // RN24
+  #recharge(id: number, robot: Robot): boolean {
+    if (!this.world.isBase(robot.position)) {
+      return this.#fail(id, 'recharge', 'notAtBase');
+    }
+    const added = robot.recharge();
+    this.#emit(id, { kind: 'recharged', added, battery: robot.battery });
+    return true;
+  }
+
+  // RN25: pega o item da casa onde o robô está
+  #collect(id: number, robot: Robot): boolean {
+    const item = this.world.itemAt(robot.position);
+    if (item === null) {
+      return this.#fail(id, 'collect', 'nothing');
+    }
+    if (!robot.cargo.fits(item)) {
+      return this.#fail(id, 'collect', 'full');
+    }
+    this.world.takeItem(robot.position);
+    robot.cargo.add(item);
+    robot.refreshView();
+    this.#emit(id, { kind: 'collected', item });
+    return true;
+  }
+
+  // RN25: passa para o armazém tudo o que couber; true se o compartimento esvaziou
+  #unload(id: number, robot: Robot): boolean {
+    if (!this.world.isBase(robot.position)) {
+      return this.#fail(id, 'unload', 'notAtBase');
+    }
+    if (robot.cargo.isEmpty) {
+      return this.#fail(id, 'unload', 'empty');
+    }
+    const count = robot.cargo.transferTo(this.world.warehouse);
+    if (count === 0) {
+      return this.#fail(id, 'unload', 'full');
+    }
+    this.#emit(id, { kind: 'unloaded', count });
+    return robot.cargo.isEmpty;
+  }
+
+  // RN27: minera a jazida da frente; o minério vai direto para o compartimento
+  #mine(id: number, robot: Robot): boolean {
+    if (!robot.hasPickaxe) {
+      return this.#fail(id, 'mine', 'noTool');
+    }
+    const front = step(robot.position, toAbsolute(robot.orientation, 'N'));
+    if (!this.world.isOre(front)) {
+      return this.#fail(id, 'mine', 'nothing');
+    }
+    if (!robot.cargo.fits('iron')) {
+      return this.#fail(id, 'mine', 'full');
+    }
+    const result = this.world.mine(front);
+    if (result === null) {
+      return this.#fail(id, 'mine', 'nothing');
+    }
+    robot.cargo.add(result.item);
+    robot.refreshView();
+    this.#emit(id, {
+      kind: 'mined',
+      item: result.item,
+      at: front,
+      depleted: result.depleted,
+    });
+    return true;
   }
 }

@@ -113,3 +113,64 @@ describe('parse', () => {
     );
   });
 });
+
+describe('parse — classes', () => {
+  it('lê a classe com os métodos; new e this viram nós próprios', () => {
+    const { body } = parse(
+      'class Contador { constructor(n) { this.n = n } mais() { this.n++ } }\nlet c = new Contador(1)',
+    );
+
+    expect(body[0]).toMatchObject({
+      kind: 'class',
+      name: 'Contador',
+      methods: [
+        { name: 'constructor', params: ['n'] },
+        { name: 'mais', params: [] },
+      ],
+    });
+    expect(body[1]).toMatchObject({
+      kind: 'let',
+      init: {
+        kind: 'new',
+        callee: { kind: 'identifier', name: 'Contador' },
+        args: [{ kind: 'number', value: 1 }],
+      },
+    });
+  });
+
+  it.each([
+    [
+      'this fora de classe',
+      'print(this)',
+      /"this" só existe dentro dos métodos/,
+    ],
+    ['método repetido', 'class A { f() {} f() {} }', /"f" aparece duas vezes/],
+    [
+      'function dentro da classe',
+      'class A { function f() {} }',
+      /escreva só o nome do método/,
+    ],
+    ['herança', 'class B extends A {}', /herança/],
+    ['classe sem fechar', 'class A { f() {}', /faltou fechar a classe/],
+  ])('rejeita %s', (_name, source, message) => {
+    expect(() => parse(source)).toThrow(message);
+  });
+});
+
+describe('parse — dicas para quem vem de outras linguagens', () => {
+  it.each([
+    ['not', 'if (not front().isEmpty) {}', /use "!" em vez de "not"/],
+    ['and', 'if (a and b) {}', /use "&&" em vez de "and"/],
+    ['or solto', 'let x = a or b', /use "\|\|" em vez de "or"/],
+    ['===', 'if (a === b) {}', /use "==" \(não existe "==="\)/],
+    ['!==', 'if (a !== b) {}', /use "!=" \(não existe "!=="\)/],
+    ['const', 'const x = 1', /use "let"/],
+    ['var', 'var x = 1', /use "let"/],
+  ])('%s', (_name, source, message) => {
+    expect(() => parse(source)).toThrow(message);
+  });
+
+  it('"not" sozinho continua sendo um nome comum', () => {
+    expect(() => parse('let not = 1\nprint(not)')).not.toThrow();
+  });
+});

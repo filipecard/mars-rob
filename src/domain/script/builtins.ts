@@ -1,4 +1,19 @@
-import type { Action, CellInfo, RobotHost, SelfInfo, Side } from './host.js';
+import { isItemKind, ITEM_KINDS, type ItemKind } from '../world/Item.js';
+import {
+  isUpgradeKind,
+  UPGRADE_KINDS,
+  type UpgradeKind,
+} from '../world/Upgrade.js';
+import type {
+  Action,
+  CellInfo,
+  Heading,
+  RobotHost,
+  SelfInfo,
+  Side,
+  StepKind,
+  StorageInfo,
+} from './host.js';
 import { ScriptRuntimeError, type SourceLocation } from './ScriptError.js';
 import {
   record,
@@ -29,6 +44,13 @@ export const BUILTIN_NAMES = [
   'shareMap',
   'forgetMap',
   'goTo',
+  'goNextTo',
+  'face',
+  'recharge',
+  'collect',
+  'unload',
+  'mine',
+  'upgrade',
   'stop',
   'front',
   'back',
@@ -38,6 +60,17 @@ export const BUILTIN_NAMES = [
   'cellAt',
   'explored',
   'nearestUnknown',
+  'nearestItem',
+  'nearestOre',
+  'battery',
+  'maxBattery',
+  'cargo',
+  'maxCargo',
+  'inventory',
+  'base',
+  'warehouse',
+  'canUpgrade',
+  'level',
   'type',
   'print',
   'abs',
@@ -59,6 +92,17 @@ export function cellRecord(cell: CellInfo): RecordValue {
     unknownAround: cell.unknownAround,
     position: positionRecord(cell.x, cell.y),
     robot: cell.robot,
+    item: cell.item,
+    obstacle: cell.obstacle,
+    isBase: cell.isBase,
+  });
+}
+
+export function storageRecord(storage: StorageInfo): RecordValue {
+  return record('storage', {
+    ...storage.items,
+    used: storage.used,
+    capacity: storage.capacity,
   });
 }
 
@@ -101,20 +145,47 @@ export function builtinScope(host: RobotHost): Scope {
   });
   // RN21: um passo por tick pelo menor caminho; para no primeiro passo que falhar
   define('goTo', 2, 2, function* ([x, y], location): Execution {
-    const path = host.pathTo(
-      integer(x ?? null, location),
-      integer(y ?? null, location),
+    return yield* walk(
+      host.pathTo(integer(x ?? null, location), integer(y ?? null, location)),
     );
-    if (path === null) {
+  });
+  // Vai até uma casa ao lado de (x, y): para minerar ou pegar algo que bloqueia
+  define('goNextTo', 2, 2, function* ([x, y], location): Execution {
+    return yield* walk(
+      host.pathNextTo(
+        integer(x ?? null, location),
+        integer(y ?? null, location),
+      ),
+    );
+  });
+  // Gira (1 tick por giro) até olhar para a casa (x, y), que precisa estar ao lado
+  define('face', 2, 2, function* ([x, y], location): Execution {
+    const me = host.self();
+    const dx = integer(x ?? null, location) - me.x;
+    const dy = integer(y ?? null, location) - me.y;
+    if (Math.abs(dx) + Math.abs(dy) !== 1) {
       return false;
     }
-    for (const kind of path) {
-      const moved = yield { kind };
-      if (!moved) {
+    const target: Heading =
+      dx === 1 ? 'east' : dx === -1 ? 'west' : dy === 1 ? 'north' : 'south';
+    const turns =
+      (HEADINGS.indexOf(target) - HEADINGS.indexOf(me.orientation) + 4) % 4;
+    if (turns === 3) {
+      return yield { kind: 'turnLeft' };
+    }
+    for (let i = 0; i < turns; i++) {
+      if (!(yield { kind: 'turnRight' })) {
         return false;
       }
     }
     return true;
+  });
+  action('recharge', { kind: 'recharge' });
+  action('collect', { kind: 'collect' });
+  action('unload', { kind: 'unload' });
+  action('mine', { kind: 'mine' });
+  define('upgrade', 1, 1, function* ([kind], location): Execution {
+    return yield { kind: 'upgrade', upgrade: upgradeKind(kind ?? null, location) };
   });
   // eslint-disable-next-line require-yield -- encerra sem pedir ação
   define('stop', 0, 0, function* (): Execution {
@@ -165,6 +236,63 @@ export function builtinScope(host: RobotHost): Scope {
       const cell = host.nearestUnknown();
       return cell === null ? null : cellRecord(cell);
     }),
+  );
+
+  define(
+    'nearestItem',
+    0,
+    1,
+    pure(([kind], location) => {
+      const cell = host.nearestItem(
+        kind === undefined || kind === null ? null : itemKind(kind, location),
+      );
+      return cell === null ? null : cellRecord(cell);
+    }),
+  );
+  define(
+    'nearestOre',
+    0,
+    0,
+    pure(() => {
+      const cell = host.nearestOre();
+      return cell === null ? null : cellRecord(cell);
+    }),
+  );
+  const status = (
+    name: (typeof BUILTIN_NAMES)[number],
+    read: () => Value,
+  ): void => {
+    define(name, 0, 0, pure(read));
+  };
+  status('battery', () => host.status().battery);
+  status('maxBattery', () => host.status().maxBattery);
+  status('cargo', () => host.status().cargo);
+  status('maxCargo', () => host.status().maxCargo);
+  status('inventory', () => ({
+    kind: 'list',
+    items: host.status().inventory,
+  }));
+  status('base', () => {
+    const { x, y } = host.base();
+    return positionRecord(x, y);
+  });
+  status('warehouse', () => storageRecord(host.warehouse()));
+  define(
+    'canUpgrade',
+    1,
+    1,
+    pure(([kind], location) =>
+      host.canUpgrade(upgradeKind(kind ?? null, location)),
+    ),
+  );
+  define(
+    'level',
+    1,
+    1,
+    pure(
+      ([kind], location) =>
+        host.status().levels[upgradeKind(kind ?? null, location)],
+    ),
   );
 
   // type(casa) devolve o que há nela; para os outros valores, o nome do tipo
@@ -223,6 +351,42 @@ export function builtinScope(host: RobotHost): Scope {
     ),
   );
   return scope;
+}
+
+const HEADINGS: readonly Heading[] = ['north', 'east', 'south', 'west'];
+
+// Anda o caminho um passo por tick; para no primeiro passo que falhar
+function* walk(path: StepKind[] | null): Execution {
+  if (path === null) {
+    return false;
+  }
+  for (const kind of path) {
+    const moved = yield { kind };
+    if (!moved) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function upgradeKind(value: Value, location: SourceLocation): UpgradeKind {
+  if (typeof value === 'string' && isUpgradeKind(value)) {
+    return value;
+  }
+  throw new ScriptRuntimeError(
+    `melhoria desconhecida ${toText(value)}: use ${UPGRADE_KINDS.map((k) => `"${k}"`).join(', ')}`,
+    location,
+  );
+}
+
+function itemKind(value: Value, location: SourceLocation): ItemKind {
+  if (typeof value === 'string' && isItemKind(value)) {
+    return value;
+  }
+  throw new ScriptRuntimeError(
+    `item desconhecido ${toText(value)}: use ${ITEM_KINDS.map((k) => `"${k}"`).join(', ')}`,
+    location,
+  );
 }
 
 // Função nativa que não pede ação: termina sem yield

@@ -3,7 +3,15 @@ import { DescribeSimulation } from '../../../../src/application/use-cases/Descri
 import { ExecuteOrders } from '../../../../src/application/use-cases/ExecuteOrders.js';
 import { LoadScript } from '../../../../src/application/use-cases/LoadScript.js';
 import { ForgetMap } from '../../../../src/application/use-cases/ForgetMap.js';
+import {
+  ListSaves,
+  LoadGame,
+  SaveGame,
+} from '../../../../src/application/use-cases/SaveGame.js';
 import { StopProgram } from '../../../../src/application/use-cases/StopProgram.js';
+import { UpgradeRobot } from '../../../../src/application/use-cases/UpgradeRobot.js';
+import { seededRandom } from '../../../../src/infrastructure/random/seededRandom.js';
+import { MemorySaveStore } from '../../application/MemorySaveStore.js';
 import { Fleet } from '../../../../src/domain/entities/Fleet.js';
 import { Grid } from '../../../../src/domain/value-objects/Grid.js';
 import { Position } from '../../../../src/domain/value-objects/Position.js';
@@ -22,6 +30,7 @@ export function controller(timers?: Timers): SimulationController {
       { position: Position.create(3, 3) },
     ]),
   );
+  const saves = new MemorySaveStore();
   return new SimulationController(
     {
       executeOrders: new ExecuteOrders(repository),
@@ -30,6 +39,10 @@ export function controller(timers?: Timers): SimulationController {
       advanceClock: new AdvanceClock(repository),
       stopProgram: new StopProgram(repository),
       forgetMap: new ForgetMap(repository),
+      upgradeRobot: new UpgradeRobot(repository),
+      saveGame: new SaveGame(repository, saves),
+      loadGame: new LoadGame(repository, saves, seededRandom),
+      listSaves: new ListSaves(saves),
     },
     timers === undefined ? {} : { timers },
   );

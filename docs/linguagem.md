@@ -33,17 +33,18 @@ while (true) {
 
 ## Comandos
 
-| Comando                        | Exemplo                                                       |
-| ------------------------------ | ------------------------------------------------------------- |
-| variável                       | `let passos = 0`                                              |
-| atribuição                     | `x = 1`, `x += 2`, `x -= 1`, `x *= 2`, `x /= 2`, `x++`, `x--` |
-| se / senão                     | `if (a) { } else if (b) { } else { }`                         |
-| enquanto                       | `while (cond) { }`                                            |
-| para                           | `for (let i = 0; i < 4; i++) { }`                             |
-| para cada                      | `for (let cell of see()) { }`                                 |
-| sair do loop / pular uma volta | `break`, `continue`                                           |
-| função                         | `function andar(n) { ... return n }`                          |
-| comentário                     | `// linha` ou `/* bloco */`                                   |
+| Comando                        | Exemplo                                                          |
+| ------------------------------ | ---------------------------------------------------------------- |
+| variável                       | `let passos = 0`                                                 |
+| atribuição                     | `x = 1`, `x += 2`, `x -= 1`, `x *= 2`, `x /= 2`, `x++`, `x--`    |
+| se / senão                     | `if (a) { } else if (b) { } else { }`                            |
+| enquanto                       | `while (cond) { }`                                               |
+| para                           | `for (let i = 0; i < 4; i++) { }`                                |
+| para cada                      | `for (let cell of see()) { }`                                    |
+| sair do loop / pular uma volta | `break`, `continue`                                              |
+| função                         | `function andar(n) { ... return n }`                             |
+| classe e objeto                | `class Contador { ... }`, `let c = new Contador(1)` (ver abaixo) |
+| comentário                     | `// linha` ou `/* bloco */`                                      |
 
 O ponto e vírgula é opcional. As chaves são opcionais quando o corpo é um único comando.
 Funções podem ser chamadas antes da linha em que foram declaradas e enxergam as variáveis
@@ -54,8 +55,42 @@ de onde foram criadas (closures).
 - Números (`1`, `2.5`), textos (`"a"` ou `'a'`), `true`, `false`, `null` e listas (`[1, 2]`).
 - Aritmética: `+ - * / %`. O `+` com um texto junta os dois (`"x = " + 1`).
 - Comparação: `== != < <= > >=`. `<` e `>` só comparam número com número ou texto com texto.
+  Posições, casas e `self` são comparados pelo valor: `self.position == cellAt(2, 3).position` é
+  `true` quando x e y são iguais. Listas e objetos criados com `new` são comparados pela
+  identidade (só são iguais a eles mesmos).
 - Lógica: `&& || !`. `false`, `null`, `0` e `""` contam como falso.
 - Listas: `lista[0]`, `lista.length`, `lista.push(x)`, `lista.pop()`, `lista.shift()`, `lista.includes(x)`.
+
+## Classes
+
+Uma classe junta dados e funções. O `constructor` roda no `new`; dentro dos métodos, `this` é o
+objeto. Os campos são criados ao atribuir (`this.passos = 0`) e podem ser alterados de fora
+(`a.passos = 5`). Os métodos escrevem só o nome, sem `function`.
+
+```js
+class Andarilho {
+  constructor(limite) {
+    this.limite = limite;
+    this.passos = 0;
+  }
+  andar() {
+    if (this.passos < this.limite && forward()) {
+      this.passos++;
+      return true;
+    }
+    return false;
+  }
+}
+
+let a = new Andarilho(10);
+while (a.andar()) {}
+print(a); // Andarilho { limite: 10, passos: 10 }
+```
+
+- Classes, como funções, podem ser usadas antes da linha em que foram declaradas.
+- Métodos podem fazer ações (gastam tick) e usar `self`, o robô. `this` é o objeto, não o robô.
+- `type(objeto)` devolve o nome da classe.
+- Herança (`extends`) ainda não existe.
 
 ## Ações (gastam 1 tick)
 
@@ -140,12 +175,12 @@ while (c != null) {
 
 ## Funções
 
-| Função                 | Devolve                                                                                                                                             |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `type(x)`              | para uma casa, o que há nela; para outros valores, `"number"`, `"string"`, `"boolean"`, `"null"`, `"list"`, `"function"`, `"position"` ou `"robot"` |
-| `print(a, b, ...)`     | escreve os valores separados por espaço                                                                                                             |
-| `abs(n)`, `floor(n)`   | valor absoluto, arredondado para baixo                                                                                                              |
-| `min(...)`, `max(...)` | menor e maior número                                                                                                                                |
+| Função                 | Devolve                                                                                                                                                                                       |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type(x)`              | para uma casa, o que há nela; para outros valores, `"number"`, `"string"`, `"boolean"`, `"null"`, `"list"`, `"function"`, `"position"`, `"robot"`, `"class"` ou o nome da classe de um objeto |
+| `print(a, b, ...)`     | escreve os valores separados por espaço                                                                                                                                                       |
+| `abs(n)`, `floor(n)`   | valor absoluto, arredondado para baixo                                                                                                                                                        |
+| `min(...)`, `max(...)` | menor e maior número                                                                                                                                                                          |
 
 ## Limites e erros
 
@@ -156,3 +191,9 @@ while (c != null) {
   Os dois informam linha e coluna, ex.: `Erro na linha 3, coluna 9: "y" não foi declarado`.
 - `self` e os nomes da linguagem não podem ser alterados. Dá para declarar uma variável com o
   mesmo nome de uma função da linguagem (`let forward = 3`), o que esconde a função naquele escopo.
+- Quando um nome não existe, o erro sugere um parecido: `"fordward" não foi declarado. Você quis
+dizer "forward"?`. O mesmo vale para campos (`front().isEmty`).
+- Chamar um campo como função explica o que fazer: `front().isEmpty()` dá `"isEmpty" é um campo,
+não uma função: use front().isEmpty, sem os parênteses`.
+- Quem vem de outras linguagens recebe uma dica ao escrever `not`, `and`, `or`, `===`, `!==`,
+  `var` ou `const` (use `!`, `&&`, `||`, `==`, `!=` e `let`).

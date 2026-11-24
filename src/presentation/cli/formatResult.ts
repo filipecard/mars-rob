@@ -1,11 +1,26 @@
 import type {
   EventDTO,
+  ItemDTO,
   OrientationDTO,
   PositionDTO,
   RobotStateDTO,
+  RobotStatusDTO,
+  StorageDTO,
 } from '../../application/dto.js';
 import type { OrderResult } from '../../application/use-cases/ExecuteOrders.js';
 import type { LoadScriptResult } from '../../application/use-cases/LoadScript.js';
+import type {
+  LoadResult,
+  SaveResult,
+} from '../../application/use-cases/SaveGame.js';
+import type { UpgradeResult } from '../../application/use-cases/UpgradeRobot.js';
+import {
+  ACTION_NAMES,
+  failText,
+  ITEM_NAMES,
+  itemList,
+  UPGRADE_NAMES,
+} from '../names.js';
 
 const ORIENTATION_NAMES: Record<OrientationDTO, string> = {
   N: 'Norte',
@@ -49,16 +64,27 @@ export function formatOrderResult(result: OrderResult): string | null {
   }
 }
 
-// Só o que interessa na CLI: bloqueios, compartilhamentos, print e erros.
-// Passos, giros e esperas aparecem no estado final de cada robô.
+// Só o que interessa na CLI: bloqueios, compartilhamentos, coleta, falhas, print e
+// erros. Passos, giros, esperas e recargas aparecem no estado final de cada robô.
 export function formatEvent(event: EventDTO): string | null {
   const name = robotName(event.robot);
   switch (event.kind) {
     case 'moved':
     case 'turned':
     case 'waited':
+    case 'recharged':
     case 'finished':
       return null;
+    case 'collected':
+      return `${name} pegou ${article(event.item)} ${ITEM_NAMES[event.item].one}`;
+    case 'unloaded':
+      return `${name} descarregou ${String(event.count)} ${event.count === 1 ? 'item' : 'itens'} no armazém`;
+    case 'mined':
+      return `${name} minerou ferro em ${formatPosition(event.at)}${event.depleted ? ' (a jazida acabou)' : ''}`;
+    case 'upgraded':
+      return `${name}: ${UPGRADE_NAMES[event.upgrade]} no nível ${String(event.level)}`;
+    case 'failed':
+      return `${name} não conseguiu ${ACTION_NAMES[event.action]}: ${failText(event.action, event.reason)}`;
     case 'blocked':
       return formatBlocked(event);
     case 'shared':
@@ -102,6 +128,72 @@ function formatShareFailed(event: EventDTO & { kind: 'shareFailed' }): string {
     case 'self':
       return `${robotName(event.robot)}: não pode enviar o mapa para si mesmo`;
   }
+}
+
+function article(item: ItemDTO): string {
+  return item === 'stone' ? 'uma' : 'um';
+}
+
+// RN24, RN25, RN28: o estado de um robô e o armazém
+export function formatStatus(
+  robot: RobotStatusDTO,
+  warehouse: StorageDTO,
+): string {
+  const levels = robot.upgrades
+    .filter(({ level }) => level > 0)
+    .map(({ upgrade, level }) => `${UPGRADE_NAMES[upgrade]} ${String(level)}`);
+  return [
+    formatRobotState(robot.map.robot) + (robot.atBase ? ' (na base)' : ''),
+    `  Bateria: ${String(robot.battery)} de ${String(robot.maxBattery)}`,
+    `  Compartimento (${String(robot.cargo.used)} de ${String(robot.cargo.capacity)}): ${itemList(robot.cargo.items)}`,
+    `  Melhorias: ${levels.length === 0 ? 'nenhuma' : levels.join(', ')}`,
+    `Armazém (${String(warehouse.used)} de ${String(warehouse.capacity)}): ${itemList(warehouse.items)}`,
+  ].join('\n');
+}
+
+// RN28
+export function formatUpgradeResult(result: UpgradeResult): string {
+  if (result.ok) {
+    return `${UPGRADE_NAMES[result.upgrade]} agora no nível ${String(result.level)}`;
+  }
+  switch (result.error) {
+    case 'UNKNOWN_ROBOT':
+      return unknownRobot(result.robotId);
+    case 'UNKNOWN_UPGRADE':
+      return `Melhoria desconhecida "${result.upgrade}": use picareta, bateria, compartimento, visao ou armazem`;
+    case 'UPGRADE_FAILED': {
+      const what = UPGRADE_NAMES[result.upgrade];
+      if (result.reason === 'missing' && result.missing !== null) {
+        return `Não deu para fazer ${what}: faltam ${itemList(result.missing)} no armazém`;
+      }
+      return `Não deu para fazer ${what}: ${failText('upgrade', result.reason)}`;
+    }
+  }
+}
+
+// RN30
+export function formatSaveResult(result: SaveResult): string {
+  return result.ok
+    ? `Simulação salva como "${result.name}" (tick ${String(result.tick)})`
+    : invalidSaveName(result.name);
+}
+
+export function formatLoadResult(result: LoadResult): string {
+  if (result.ok) {
+    return `Simulação "${result.name}" carregada (tick ${String(result.tick)}). Os scripts que estavam rodando recomeçaram.`;
+  }
+  switch (result.error) {
+    case 'INVALID_NAME':
+      return invalidSaveName(result.name);
+    case 'NOT_FOUND':
+      return `Não existe simulação salva com o nome "${result.name}"`;
+    case 'INVALID_SAVE':
+      return `O arquivo "${result.name}" não é uma simulação salva válida`;
+  }
+}
+
+function invalidSaveName(name: string): string {
+  return `Nome inválido "${name}": use letras sem acento, números, _ ou - (até 40)`;
 }
 
 export function formatLoadScriptResult(

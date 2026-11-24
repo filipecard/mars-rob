@@ -260,6 +260,27 @@ export const ENTRIES: readonly Entry[] = [
       'Declara uma função. Pode ser chamada antes da linha em que foi declarada.',
   },
   {
+    name: 'class',
+    kind: 'keyword',
+    signature: 'class Nome { constructor(a) { this.a = a } metodo() { } }',
+    description:
+      'Declara uma classe. O constructor roda no new; dentro dos métodos, this é o objeto. Métodos sem a palavra function.',
+  },
+  {
+    name: 'new',
+    kind: 'keyword',
+    signature: 'new Nome(a, b)',
+    description:
+      'Cria um objeto da classe, rodando o constructor com os argumentos.',
+  },
+  {
+    name: 'this',
+    kind: 'keyword',
+    signature: 'this.campo',
+    description:
+      'Dentro de um método, o próprio objeto. Campos são criados ao atribuir: this.passos = 0.',
+  },
+  {
     name: 'return',
     kind: 'keyword',
     signature: 'return valor',

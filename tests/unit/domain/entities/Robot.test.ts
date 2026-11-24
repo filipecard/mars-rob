@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Robot } from '../../../../src/domain/entities/Robot.js';
+import {
+  Robot,
+  type MemoryEntry,
+} from '../../../../src/domain/entities/Robot.js';
 import { CollisionError } from '../../../../src/domain/errors/CollisionError.js';
 import { ObstacleError } from '../../../../src/domain/errors/ObstacleError.js';
 import { OutOfGridError } from '../../../../src/domain/errors/OutOfGridError.js';
@@ -7,6 +10,12 @@ import { Command } from '../../../../src/domain/value-objects/Command.js';
 import { Grid } from '../../../../src/domain/value-objects/Grid.js';
 import { Obstacle } from '../../../../src/domain/value-objects/Obstacle.js';
 import { Position } from '../../../../src/domain/value-objects/Position.js';
+
+// Uma casa do mapa de outro robô (livre, sem item)
+const entry = (x: number, y: number): MemoryEntry => ({
+  position: Position.create(x, y),
+  seen: { ground: 'free', item: null },
+});
 
 describe('Robot', () => {
   const grid = Grid.standard();
@@ -264,7 +273,7 @@ describe('Robot', () => {
     it('receber um mapa não marca casas como visitadas — RN16', () => {
       const robot = Robot.create(grid);
 
-      robot.receiveMap([Position.create(5, 5)]);
+      robot.receiveMap([entry(5, 5)]);
 
       expect(robot.hasExplored(Position.create(5, 5))).toBe(true);
       expect(robot.hasVisited(Position.create(5, 5))).toBe(false);
@@ -331,10 +340,10 @@ describe('Robot', () => {
       const robot = Robot.create(grid);
 
       const added = robot.receiveMap([
-        Position.create(0, 0),
-        Position.create(5, 5),
-        Position.create(5, 6),
-        Position.create(5, 6),
+        entry(0, 0),
+        entry(5, 5),
+        entry(5, 6),
+        entry(5, 6),
       ]);
 
       expect(added).toBe(2);
@@ -342,7 +351,7 @@ describe('Robot', () => {
     });
 
     it('ignora casas fora da malha', () => {
-      expect(Robot.create(grid).receiveMap([Position.create(16, 0)])).toBe(0);
+      expect(Robot.create(grid).receiveMap([entry(16, 0)])).toBe(0);
     });
 
     it.each<[number, number, boolean]>([
