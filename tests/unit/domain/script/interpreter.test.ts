@@ -467,6 +467,30 @@ describe('ScriptProcess — erros de execução', () => {
   });
 });
 
+describe('ScriptProcess — nearestUnknown — RN22', () => {
+  it('devolve a casa (sem gastar tick) ou null', () => {
+    const host = new FakeHost();
+    host.frontier = {
+      type: 'empty',
+      x: 2,
+      y: -1,
+      robot: null,
+      visited: false,
+      unknownAround: 3,
+    };
+
+    const found = runScript(
+      'let c = nearestUnknown(); print(c.position, c.unknownAround)',
+      { host },
+    );
+    const none = runScript('print(nearestUnknown())');
+
+    expect(found.actions).toEqual([]);
+    expect(found.host.printed).toEqual(['(2, -1) 3']);
+    expect(none.host.printed).toEqual(['null']);
+  });
+});
+
 describe('ScriptProcess — goTo — RN21', () => {
   it('pede o caminho ao robô e dá um passo por tick; devolve true ao chegar', () => {
     const host = new FakeHost();

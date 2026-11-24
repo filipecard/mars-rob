@@ -76,11 +76,11 @@ Cada ação devolve `true` se deu certo e `false` se não deu (ex.: andar contra
 | `stop()`       | encerra o programa (não gasta tick)                   |
 
 `goTo(x, y)` leva o robô até a casa (x, y) pelo menor caminho no mapa dele, um passo por tick e
-sem girar (anda de frente, de costas ou de lado). Casa desconhecida conta como livre, e ele não passa
-por obstáculos que conhece nem por robôs que está vendo. O caminho é calculado uma vez, no começo:
-se um passo for bloqueado (um obstáculo que ele não conhecia, outro robô, a borda), ele para ali e
-`goTo` devolve `false`. Ao chegar, devolve `true`. Se o destino está fora da malha, é um obstáculo
-conhecido ou não há caminho, devolve `false` sem gastar tick.
+sem girar (anda de frente, de costas ou de lado). Ele só anda por casas que já conhece: contorna os
+obstáculos e os robôs que está vendo, e nunca entra em casa desconhecida. O caminho é calculado uma
+vez, no começo: se um passo for bloqueado (outro robô entrou no caminho), ele para ali e `goTo`
+devolve `false`. Ao chegar, devolve `true`. Se o destino está fora da malha, é desconhecido, é um
+obstáculo ou não há caminho conhecido, devolve `false` sem gastar tick.
 
 ```js
 if (!goTo(5, 5)) {
@@ -93,13 +93,14 @@ lugar, volta a conhecer a própria casa (como visitada) e o 3x3 em volta, igual 
 
 ## Sensores (não gastam tick)
 
-| Sensor                                   | Devolve                                                                                                   |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `front()`, `back()`, `left()`, `right()` | a casa vizinha, relativa a para onde o robô olha                                                          |
-| `see()`                                  | lista das casas da visão (3x3 em volta, sem a do próprio robô)                                            |
-| `cellAt(x, y)`                           | a casa no mapa do robô (`"unknown"` se ele ainda não viu)                                                 |
-| `explored()`                             | quantas casas o robô já conhece                                                                           |
-| `self`                                   | o próprio robô: `self.id`, `self.position`, `self.orientation` (`"north"`, `"east"`, `"south"`, `"west"`) |
+| Sensor                                   | Devolve                                                                                                    |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `front()`, `back()`, `left()`, `right()` | a casa vizinha, relativa a para onde o robô olha                                                           |
+| `see()`                                  | lista das casas da visão (3x3 em volta, sem a do próprio robô)                                             |
+| `cellAt(x, y)`                           | a casa no mapa do robô (`"unknown"` se ele ainda não viu)                                                  |
+| `explored()`                             | quantas casas o robô já conhece                                                                            |
+| `nearestUnknown()`                       | a casa conhecida e livre mais próxima (em passos) de onde ele vê algo desconhecido, ou `null` (ver abaixo) |
+| `self`                                   | o próprio robô: `self.id`, `self.position`, `self.orientation` (`"north"`, `"east"`, `"south"`, `"west"`)  |
 
 Uma **casa** tem:
 
@@ -123,6 +124,18 @@ if (left().isEmpty && left().unknownAround > front().unknownAround) {
 }
 if (front().isEmpty) forward();
 else turnRight();
+```
+
+`nearestUnknown()` procura, pelo caminho que `goTo` faria, a casa mais perto de onde o robô
+descobriria algo novo (`unknownAround` maior que 0). Ela é conhecida, então `goTo` chega nela.
+Devolve `null` quando não sobrou nada desconhecido que ele consiga alcançar. Para explorar tudo:
+
+```js
+let c = nearestUnknown();
+while (c != null) {
+  goTo(c.position.x, c.position.y);
+  c = nearestUnknown();
+}
 ```
 
 ## Funções

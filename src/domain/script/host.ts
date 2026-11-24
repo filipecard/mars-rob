@@ -56,8 +56,10 @@ export interface RobotHost {
   cellAt(x: number, y: number): CellInfo;
   // Quantas casas o robô conhece
   explored(): number;
-  // RN21: o menor caminho até (x, y) pelo mapa do robô, em passos sem giro.
+  // RN21: o menor caminho até (x, y) só por casas conhecidas, em passos sem giro.
   // [] se ele já está lá; null se não há caminho conhecido.
   pathTo(x: number, y: number): StepKind[] | null;
+  // RN22: a casa conhecida mais próxima de onde se vê algo desconhecido (null se não há)
+  nearestUnknown(): CellInfo | null;
   print(text: string): void;
 }

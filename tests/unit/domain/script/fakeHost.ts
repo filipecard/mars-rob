@@ -20,6 +20,7 @@ export class FakeHost implements RobotHost {
   known = 9;
   path: StepKind[] | null = [];
   pathRequests: [number, number][] = [];
+  frontier: CellInfo | null = null;
 
   self(): SelfInfo {
     return { ...this.state };
@@ -60,6 +61,10 @@ export class FakeHost implements RobotHost {
   pathTo(x: number, y: number): StepKind[] | null {
     this.pathRequests.push([x, y]);
     return this.path;
+  }
+
+  nearestUnknown(): CellInfo | null {
+    return this.frontier;
   }
 
   print(text: string): void {

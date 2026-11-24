@@ -85,7 +85,7 @@ export const ENTRIES: readonly Entry[] = [
     kind: 'action',
     signature: 'goTo(x, y)',
     description:
-      'Vai até (x, y) pelo menor caminho que conhece, um passo por tick e sem girar. Casa desconhecida conta como livre. Se algo bloquear um passo, para ali e devolve false; ao chegar, true. Sem caminho conhecido, devolve false na hora.',
+      'Vai até (x, y) pelo menor caminho, só por casas que já conhece, um passo por tick e sem girar. Contorna obstáculos e robôs que está vendo. Se algo bloquear um passo, para ali e devolve false; ao chegar, true. Destino desconhecido ou sem caminho conhecido: devolve false na hora.',
     params: 2,
   },
   {
@@ -153,6 +153,14 @@ export const ENTRIES: readonly Entry[] = [
     kind: 'sensor',
     signature: 'explored()',
     description: 'Quantas casas o robô já conhece.',
+    params: 0,
+  },
+  {
+    name: 'nearestUnknown',
+    kind: 'sensor',
+    signature: 'nearestUnknown()',
+    description:
+      'A casa conhecida e livre mais próxima (em passos) de onde o robô vê alguma casa desconhecida, ou null se não há mais nada a descobrir ao alcance. Use com goTo para explorar.',
     params: 0,
   },
   {

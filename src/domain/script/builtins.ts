@@ -37,6 +37,7 @@ export const BUILTIN_NAMES = [
   'see',
   'cellAt',
   'explored',
+  'nearestUnknown',
   'type',
   'print',
   'abs',
@@ -154,6 +155,16 @@ export function builtinScope(host: RobotHost): Scope {
     0,
     0,
     pure(() => host.explored()),
+  );
+
+  define(
+    'nearestUnknown',
+    0,
+    0,
+    pure(() => {
+      const cell = host.nearestUnknown();
+      return cell === null ? null : cellRecord(cell);
+    }),
   );
 
   // type(casa) devolve o que há nela; para os outros valores, o nome do tipo

@@ -148,7 +148,10 @@ describe('FleetRobotHost — RN18', () => {
 
 describe('FleetRobotHost.pathTo — RN21', () => {
   it('menor caminho contornando o obstáculo conhecido e o robô visível', () => {
-    const { host } = setup();
+    const { fleet, host } = setup();
+    // vai e volta pela esquerda para conhecer (0,2)
+    fleet.move(1, Command.parse('ONN'));
+    fleet.move(1, Command.parse('SSL'));
 
     // (0,1) é obstáculo e o 2 está em (1,0): sai pela esquerda
     expect(host.pathTo(0, 2)).toEqual([
@@ -163,19 +166,21 @@ describe('FleetRobotHost.pathTo — RN21', () => {
     const { fleet, host } = setup();
     fleet.move(1, Command.parse('D'));
 
-    // olhando para o Leste, o Sul fica à direita
-    expect(host.pathTo(0, -2)).toEqual(['stepRight', 'stepRight']);
+    // olhando para o Leste, o Sul fica à direita e o Oeste atrás
+    expect(host.pathTo(-1, -1)).toEqual(['stepRight', 'backward']);
   });
 
-  it('casa desconhecida conta como livre', () => {
+  it('só anda pelo que conhece: destino desconhecido não tem caminho', () => {
     const { host } = setup();
 
-    expect(host.pathTo(-1, 3)).toEqual([
-      'stepLeft',
-      'forward',
-      'forward',
-      'forward',
-    ]);
+    expect(host.pathTo(-1, 3)).toBeNull();
+  });
+
+  it('CA83 — destino conhecido, mas só alcançável por casas desconhecidas: sem caminho', () => {
+    const { host } = setup();
+
+    // (1,1): (0,1) é obstáculo, o 2 está em (1,0) e (1,2)/(2,1) são desconhecidas
+    expect(host.pathTo(1, 1)).toBeNull();
   });
 
   it('robô no destino: o caminho vai até ele (o último passo vai falhar)', () => {
@@ -206,6 +211,28 @@ describe('FleetRobotHost.pathTo — RN21', () => {
     );
     const host = new FleetRobotHost(fleet, 1, () => undefined);
 
-    expect(host.pathTo(3, 3)).toBeNull();
+    expect(host.pathTo(-1, -1)).toBeNull();
+    expect(host.nearestUnknown()).toBeNull();
+  });
+});
+
+describe('FleetRobotHost.nearestUnknown — RN22', () => {
+  it('CA84 — a casa conhecida mais próxima de onde se vê algo desconhecido', () => {
+    const { host } = setup();
+
+    // na frente há obstáculo e à direita o robô 2: a mais próxima é a de trás
+    expect(host.nearestUnknown()).toMatchObject({
+      type: 'empty',
+      x: 0,
+      y: -1,
+      unknownAround: 3,
+    });
+  });
+
+  it('mapa todo conhecido: null', () => {
+    const fleet = Fleet.place(Grid.square(1), [{ position: at(0, 0) }]);
+    const host = new FleetRobotHost(fleet, 1, () => undefined);
+
+    expect(host.nearestUnknown()).toBeNull();
   });
 });

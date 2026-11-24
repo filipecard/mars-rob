@@ -312,9 +312,9 @@ describe('Simulation — apagar o mapa — RN20', () => {
 
 describe('Simulation — goTo — RN21', () => {
   it('chega ao destino pelo menor caminho, um passo por tick', () => {
-    // de (0,0) a (-1,-2): 3 passos, longe do obstáculo em (0,2)
+    // anda para trás para conhecer (-1,-2) e vai até lá: 1 + 2 passos
     const sim = simulation();
-    sim.loadScript(1, 'print(goTo(-1, -2))');
+    sim.loadScript(1, 'backward(); print(goTo(-1, -2))');
 
     const events = runAll(sim);
 
@@ -327,19 +327,35 @@ describe('Simulation — goTo — RN21', () => {
     );
   });
 
-  it('para quando encontra um obstáculo que não conhecia e devolve false', () => {
-    // (0,2) é obstáculo, mas de (0,0) o robô ainda não o vê
+  it('CA80 — destino desconhecido: devolve false sem andar', () => {
     const sim = simulation();
     sim.loadScript(1, 'print(goTo(0, 3), self.position)');
 
     const events = runAll(sim);
 
-    expect(summary(events)).toEqual([
-      '1:1:moved',
-      '2:1:blocked',
-      '3:1:printed',
-      '3:1:finished',
-    ]);
-    expect(events[2]).toMatchObject({ text: 'false (0, 1)' });
+    expect(events.some((e) => e.kind === 'moved')).toBe(false);
+    expect(events).toContainEqual(
+      expect.objectContaining({ kind: 'printed', text: 'false (0, 0)' }),
+    );
+  });
+
+  it('CA85 — com nearestUnknown e goTo o robô explora a malha toda', () => {
+    const sim = simulation();
+    sim.loadScript(
+      1,
+      `let c = nearestUnknown();
+      while (c != null) {
+        goTo(c.position.x, c.position.y);
+        c = nearestUnknown();
+      }
+      print(explored())`,
+    );
+
+    const events = runAll(sim, 500);
+
+    // malha 7x7 = 49 casas
+    expect(events).toContainEqual(
+      expect.objectContaining({ kind: 'printed', text: '49' }),
+    );
   });
 });

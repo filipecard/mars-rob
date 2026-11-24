@@ -130,23 +130,51 @@ export class FleetRobotHost implements RobotHost {
     return count;
   }
 
-  // RN21: busca em largura pela malha. Casa desconhecida conta como livre; não passa
-  // por obstáculo que o robô conhece nem por robô que ele está vendo agora (a não ser
-  // que seja o destino: aí ele vai até o lado e o último passo falha).
+  // RN21: menor caminho só pelo que o robô conhece. O destino precisa ser uma casa
+  // conhecida e livre; não passa por obstáculo nem por casa desconhecida, e contorna
+  // robôs que está vendo agora (a não ser no destino: aí ele vai até o lado e o último
+  // passo falha).
   pathTo(x: number, y: number): StepKind[] | null {
-    const { grid } = this.#fleet;
-    const robot = this.#robot;
     const target = Position.create(x, y);
-    if (
-      !grid.contains(target) ||
-      (robot.hasExplored(target) && grid.isBlocked(target))
-    ) {
+    if (!this.#isKnownFree(target)) {
       return null;
     }
-    const passable = (cell: Position): boolean =>
+    const found = this.#search(
+      (cell) => cell.equals(target),
+      (cell) => cell.equals(target),
+    );
+    return found === null ? null : found.steps;
+  }
+
+  // RN22: a casa conhecida e livre mais próxima (em passos, pelo mapa do robô) de onde
+  // ele vê alguma casa desconhecida. null se não há nenhuma ao alcance.
+  nearestUnknown(): CellInfo | null {
+    const found = this.#search(
+      (cell) => this.#unknownAround(cell) > 0,
+      () => false,
+    );
+    return found === null ? null : this.cellAt(found.cell.x, found.cell.y);
+  }
+
+  #isKnownFree(cell: Position): boolean {
+    const { grid } = this.#fleet;
+    return (
       grid.contains(cell) &&
-      !(robot.hasExplored(cell) && grid.isBlocked(cell)) &&
-      (cell.equals(target) ||
+      this.#robot.hasExplored(cell) &&
+      !grid.isBlocked(cell)
+    );
+  }
+
+  // Busca em largura a partir do robô, pelas casas conhecidas e livres, até a primeira
+  // que satisfaz `isGoal`. `mayHaveRobot` diz onde um robô visível não impede a entrada.
+  #search(
+    isGoal: (cell: Position) => boolean,
+    mayHaveRobot: (cell: Position) => boolean,
+  ): { cell: Position; steps: StepKind[] } | null {
+    const robot = this.#robot;
+    const passable = (cell: Position): boolean =>
+      this.#isKnownFree(cell) &&
+      (mayHaveRobot(cell) ||
         !robot.canSee(cell) ||
         this.#fleet.robotAt(cell) === undefined);
 
@@ -156,8 +184,8 @@ export class FleetRobotHost implements RobotHost {
     const queue = [start];
     for (let i = 0; i < queue.length; i++) {
       const current = queue[i] as Position;
-      if (current.equals(target)) {
-        return this.#steps(cameFrom, start, target);
+      if (isGoal(current)) {
+        return { cell: current, steps: this.#steps(cameFrom, start, current) };
       }
       for (const [kind, direction] of STEPS) {
         const next = step(current, toAbsolute(robot.orientation, direction));
