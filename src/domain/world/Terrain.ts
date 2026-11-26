@@ -2,7 +2,7 @@ import type { Position } from '../value-objects/Position.js';
 import type { ItemKind } from './Item.js';
 
 // O que há no chão de uma casa. 'base' é livre; 'rock', 'tree' e 'ore' bloqueiam.
-export type Ground = 'free' | 'base' | 'rock' | 'tree' | 'ore';
+export type Ground = 'free' | 'base' | 'rock' | 'tree' | 'ore' | 'sand' | 'ice';
 
 // Como uma casa está num momento: é o que o robô guarda no mapa dele (RN12)
 export interface CellSnapshot {
@@ -21,4 +21,5 @@ export interface Terrain {
   contains(position: Position): boolean;
   isBlocked(position: Position): boolean;
   describe(position: Position): CellSnapshot;
+  movementCost?(position: Position): number;
 }

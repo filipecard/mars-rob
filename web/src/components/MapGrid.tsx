@@ -10,7 +10,11 @@ function label(cell: MapCell): string {
   if (cell.kind === 'self' && cell.orientation !== null) {
     return ORIENTATION_ARROWS[cell.orientation];
   }
-  return cell.kind === 'other' ? String(cell.robotId) : '';
+  if (cell.kind === 'other') return String(cell.robotId);
+  if (cell.kind === 'obstacle') {
+    return cell.ground === 'tree' ? 'T' : cell.ground === 'ore' ? '$' : 'R';
+  }
+  return '';
 }
 
 const LEGEND = [
@@ -18,6 +22,25 @@ const LEGEND = [
   ['seen', 'Só viu'],
   ['obstacle', 'Obstáculo'],
   ['unknown', 'Desconhecido'],
+] as const;
+
+const MAP_DETAILS = [
+  { classes: 'cell-unknown', symbol: '?', text: 'Casa que este robô ainda não viu' },
+  { classes: 'cell-visited', symbol: '·', text: 'Casa onde este robô já pisou' },
+  { classes: 'cell-seen', symbol: '·', text: 'Casa vista, mas ainda não visitada' },
+  { classes: 'cell-obstacle', symbol: 'R', text: 'Rocha: bloqueia a passagem' },
+  { classes: 'cell-obstacle', symbol: 'T', text: 'Árvore: bloqueia a passagem' },
+  { classes: 'cell-obstacle', symbol: '$', text: 'Jazida: bloqueia a passagem' },
+  { classes: 'cell-base', symbol: 'B', text: 'Base' },
+  { classes: 'cell-visited', symbol: '', text: 'Casa livre sem item' },
+  { classes: 'cell-self', symbol: '▲', text: 'Este robô; a seta indica para onde olha' },
+  { classes: 'cell-other', symbol: '2', text: 'Outro robô; o número é o ID' },
+  { classes: 'cell-seen ground-sand', symbol: '~', text: 'Areia: cada passo custa 2 de bateria' },
+  { classes: 'cell-seen ground-ice', symbol: '_', text: 'Gelo: passos não gastam bateria' },
+  { classes: 'cell-visited cell-item-branch', symbol: ',', text: 'Galho no chão' },
+  { classes: 'cell-visited cell-item-stone', symbol: 'o', text: 'Pedra no chão' },
+  { classes: 'cell-visited cell-item-log', symbol: '=', text: 'Tronco no chão' },
+  { classes: 'cell-visited cell-item-iron', symbol: '%', text: 'Ferro no chão' },
 ] as const;
 
 const MIN_CELL_SIZE = 4;
@@ -113,7 +136,7 @@ export const MapGrid = memo(function MapGrid({
               <button
                 key={`${String(cell.x)},${String(cell.y)}`}
                 type="button"
-                className={`cell cell-${cell.kind}${cell.isBase ? ' cell-base' : ''}${cell.item === null ? '' : ` cell-item-${cell.item}`}`}
+                className={`cell cell-${cell.kind} ground-${cell.ground}${cell.isBase ? ' cell-base' : ''}${cell.item === null ? '' : ` cell-item-${cell.item}`}`}
                 title={`(${String(cell.x)}, ${String(cell.y)})${cell.item === null ? '' : ` · ${cell.item}`}${cell.isBase ? ' · base' : ''}`}
                 aria-label={`Casa (${String(cell.x)}, ${String(cell.y)})${cell.item === null ? '' : `, item ${cell.item}`}${cell.isBase ? ', base' : ''}`}
                 onClick={() => onCellClick?.(cell.x, cell.y)}
@@ -139,6 +162,14 @@ export const MapGrid = memo(function MapGrid({
         {LEGEND.map(([kind, text]) => (
           <li key={kind}>
             <span className={`cell cell-${kind}`} aria-hidden="true" />
+            {text}
+          </li>
+        ))}
+      </ul>
+      <ul className="map-legend map-legend-details" aria-label="Elementos e simbolos do mapa">
+        {MAP_DETAILS.map(({ classes, symbol, text }, index) => (
+          <li key={`${classes}-${index}`}>
+            <span className={`cell ${classes}`} aria-hidden="true">{symbol}</span>
             {text}
           </li>
         ))}

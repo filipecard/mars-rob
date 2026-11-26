@@ -12,3 +12,13 @@ Ideias anotadas para evoluir o projeto. Nenhuma está implementada.
    porta de repositório da camada de aplicação.
 6. **Outra interface (API HTTP ou web)**: trocar só a camada `presentation`, provando que o resto
    da Clean Architecture não muda.
+
+## Implementado depois desta lista
+
+- Missões simples e estatísticas de exploração, itens e melhorias na interface web.
+- Terrenos de areia (passos custam 2 de bateria) e gelo (passos não gastam bateria), gerados no mundo.
+- Mensagens entre robôs próximos, com histórico curto enquanto o servidor estiver ligado.
+- Planejamento de rotas pela interface, usando apenas casas livres já conhecidas pelo robô.
+- Nome e cor personalizados para cada robô, guardados no navegador.
+
+Replay, editor de cenários, desafios de programação e novos tipos de robôs continuam fora do escopo atual.

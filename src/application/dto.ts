@@ -30,7 +30,7 @@ export type ItemDTO = 'branch' | 'stone' | 'log' | 'iron';
 export type UpgradeDTO =
   'pickaxe' | 'battery' | 'cargo' | 'vision' | 'warehouse';
 
-export type GroundDTO = 'free' | 'base' | 'rock' | 'tree' | 'ore';
+export type GroundDTO = 'free' | 'base' | 'rock' | 'tree' | 'ore' | 'sand' | 'ice';
 
 export type ItemCountsDTO = Record<ItemDTO, number>;
 
@@ -96,6 +96,8 @@ export interface UpgradeOfferDTO {
   maxLevel: number;
   // null: já está no nível máximo
   cost: ItemCountsDTO | null;
+  // Custos de todos os níveis, para a interface explicar os requisitos futuros.
+  costs: { level: number; items: ItemCountsDTO }[];
   available: boolean;
   reason: UpgradeFailureDTO | null;
 }
@@ -168,6 +170,10 @@ export function toUpgradeOffers(world: World, robot: Robot): UpgradeOfferDTO[] {
       level,
       maxLevel,
       cost: level < maxLevel ? upgradeCost(upgrade, level + 1) : null,
+      costs: Array.from({ length: maxLevel }, (_, index) => ({
+        level: index + 1,
+        items: upgradeCost(upgrade, index + 1),
+      })),
       available: check.ok,
       reason: check.ok ? null : check.reason,
     };

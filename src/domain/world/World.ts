@@ -93,6 +93,7 @@ export interface WorldSnapshot {
   items: { x: number; y: number; item: ItemKind }[];
   warehouse: ItemCounts;
   warehouseLevel: number;
+  specialGround?: { x: number; y: number; ground: 'sand' | 'ice' }[];
 }
 
 // RN23–RN27: o mundo vivo sobre a malha fixa (as rochas). Tem a base, os itens no
@@ -109,6 +110,7 @@ export class World implements Terrain {
   readonly #treeAt = new Map<string, Tree>();
   readonly #ores = new Map<string, Ore>();
   readonly #items = new Map<string, ItemKind>();
+  readonly #specialGround = new Map<string, 'sand' | 'ice'>();
   #warehouseLevel = 0;
 
   private constructor(grid: Grid, settings: WorldSettings, random: Random) {
@@ -156,6 +158,7 @@ export class World implements Terrain {
     for (const { x, y, item } of snapshot.items) {
       world.#items.set(keyOf({ x, y }), item);
     }
+    for (const { x, y, ground } of snapshot.specialGround ?? []) world.#specialGround.set(keyOf({ x, y }), ground);
     for (let level = 0; level < snapshot.warehouseLevel; level++) {
       world.upgradeWarehouse();
     }
@@ -193,6 +196,7 @@ export class World implements Terrain {
       }),
       warehouse: this.warehouse.counts(),
       warehouseLevel: this.#warehouseLevel,
+      specialGround: [...this.#specialGround].map(([key, ground]) => { const [x = 0, y = 0] = key.split(',').map(Number); return { x, y, ground }; }),
     };
   }
 
@@ -235,6 +239,11 @@ export class World implements Terrain {
 
   describe(position: Position): CellSnapshot {
     return { ground: this.#groundAt(position), item: this.itemAt(position) };
+  }
+
+  movementCost(position: Position): number {
+    const ground = this.#specialGround.get(keyOf(position));
+    return ground === 'sand' ? 2 : ground === 'ice' ? 0 : 1;
   }
 
   isBase(position: Position): boolean {
@@ -362,7 +371,7 @@ export class World implements Terrain {
     if (this.#ores.has(key)) {
       return 'ore';
     }
-    return this.isBase(position) ? 'base' : 'free';
+    return this.isBase(position) ? 'base' : this.#specialGround.get(key) ?? 'free';
   }
 
   #populate(): void {
@@ -389,6 +398,12 @@ export class World implements Terrain {
     }
     for (let i = 0; i < initialOres; i++) {
       this.#spawnOre(() => false);
+    }
+    for (let i = 0; i < Math.floor((this.max - this.min + 1) ** 2 * 0.025); i++) {
+      const cell = this.#randomCell();
+      if (!this.#nearBase(cell) && !this.isBlocked(cell) && !this.#items.has(keyOf(cell)) && !this.isBase(cell)) {
+        this.#specialGround.set(keyOf(cell), i % 2 === 0 ? 'sand' : 'ice');
+      }
     }
   }
 

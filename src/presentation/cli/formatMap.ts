@@ -24,6 +24,8 @@ const GROUND_SYMBOLS: Record<GroundDTO, string> = {
   rock: OBSTACLE_SYMBOL,
   tree: 'T',
   ore: '$',
+  sand: '~',
+  ice: '_',
 };
 
 // RN25: itens no chão

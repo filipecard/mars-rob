@@ -4,6 +4,7 @@ import type { RobotStatusDTO } from '../api/types.js';
 import type { ScriptErrorInfo } from '../logic/events.js';
 import { exploration, ORIENTATION_NAMES } from '../logic/mapCells.js';
 import { loadSavedScript, saveScript } from '../logic/scripts.js';
+import { routeCommands } from '../logic/planner.js';
 import { MapGrid } from './MapGrid.js';
 import { ScriptEditor } from './ScriptEditor.js';
 
@@ -30,6 +31,10 @@ export function RobotPanel({ robot, api, runtimeError, onClearError }: Props) {
   } | null>(null);
   const [insertId, setInsertId] = useState(0);
   const [selectedPosition, setSelectedPosition] = useState<string | null>(null);
+  const [planning, setPlanning] = useState(false);
+  const [routeMessage, setRouteMessage] = useState('');
+  const [robotName, setRobotName] = useState(() => localStorage.getItem(`mars-rob-name-${robot.id}`) ?? `Robô ${robot.id}`);
+  const [robotColor, setRobotColor] = useState(() => localStorage.getItem(`mars-rob-color-${robot.id}`) ?? '#f3f7ff');
   const { map } = robot;
   const { known, total } = exploration(map);
   const error = syntaxError ?? runtimeError;
@@ -57,6 +62,7 @@ export function RobotPanel({ robot, api, runtimeError, onClearError }: Props) {
   return (
     <article className="robot" aria-labelledby={`robot-${String(robot.id)}`}>
       <header className="robot-head">
+        <div className="robot-identity"><span className="robot-color" style={{ background: robotColor }} /><input aria-label={`Nome do robô ${robot.id}`} value={robotName} maxLength={24} onChange={(event) => { setRobotName(event.target.value); localStorage.setItem(`mars-rob-name-${robot.id}`, event.target.value); }} /><input aria-label={`Cor do robô ${robot.id}`} type="color" value={robotColor} onChange={(event) => { setRobotColor(event.target.value); localStorage.setItem(`mars-rob-color-${robot.id}`, event.target.value); }} /></div>
         <h2 id={`robot-${String(robot.id)}`}>Robô {robot.id}</h2>
         <p className={`status status-${robot.program ?? 'idle'}`}>
           {robot.program === null ? 'Parado' : PROGRAM_LABELS[robot.program]}
@@ -64,15 +70,25 @@ export function RobotPanel({ robot, api, runtimeError, onClearError }: Props) {
       </header>
       <div className="robot-workbench">
         <section className="robot-map-panel" aria-label="Mapa e recursos">
+          <button type="button" aria-pressed={planning} onClick={() => { setPlanning(!planning); setRouteMessage(''); }}>{planning ? 'Cancelar rota' : 'Planejar rota'}</button>
           <MapGrid
             map={map}
             onCellClick={(x, y) => {
+              if (planning) {
+                const commands = routeCommands(map, { x, y });
+                if (commands === null) setRouteMessage('Não há caminho conhecido até essa casa.');
+                else if (commands === '') setRouteMessage('O robô já está nessa casa.');
+                else void api.sendOrders(`${robot.id}:${commands}`).then(() => { setRouteMessage(`Rota enviada: ${commands.length} ações.`); setPlanning(false); });
+                return;
+              }
               setSelectedPosition(`(${String(x)}, ${String(y)})`);
               const id = insertId + 1;
               setInsertId(id);
               setInsertRequest({ text: `${String(x)}, ${String(y)}`, id });
             }}
           />
+          {planning && <p className="robot-facts">Clique numa casa já explorada e livre para enviar uma rota segura.</p>}
+          {routeMessage !== '' && <p role="status" className="robot-facts">{routeMessage}</p>}
           {selectedPosition !== null && (
             <p className="robot-facts">
               Posição selecionada: {selectedPosition} · coordenadas inseridas no

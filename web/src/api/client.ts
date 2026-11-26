@@ -23,6 +23,14 @@ export class ApiClient {
     return this.#request('POST', '/api/orders', { line });
   }
 
+  listMessages(): Promise<{ from: number; to: number; text: string; tick: number }[]> {
+    return this.#request('GET', '/api/messages');
+  }
+
+  sendMessage(from: number, to: number, text: string): Promise<{ from: number; to: number; text: string; tick: number }[]> {
+    return this.#request('POST', '/api/messages', { from, to, text });
+  }
+
   // Erro de sintaxe volta como resultado (status 400), não como exceção
   loadScript(robotId: number, source: string): Promise<LoadScriptResult> {
     return this.#request('POST', `/api/robots/${String(robotId)}/script`, {

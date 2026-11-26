@@ -297,7 +297,11 @@ export class Simulation {
   // RN24: confere a carga, aplica a ação e só cobra se ela deu certo
   #apply(id: number, action: Action): boolean {
     const robot = this.fleet.robot(id);
-    const cost = ACTION_COSTS[action.kind] ?? 0;
+    let cost = ACTION_COSTS[action.kind] ?? 0;
+    if (action.kind in MOVES && robot.terrain.movementCost !== undefined) {
+      const destination = step(robot.position, toAbsolute(robot.orientation, MOVES[action.kind as keyof typeof MOVES]));
+      cost = robot.terrain.movementCost(destination);
+    }
     if (!robot.canAfford(cost)) {
       this.#fail(id, action.kind, 'noBattery');
       return false;

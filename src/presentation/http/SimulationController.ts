@@ -62,6 +62,7 @@ const NOT_FOUND = error(404, 'Rota não encontrada');
 export class SimulationController {
   readonly #useCases: HttpUseCases;
   readonly #listeners = new Set<Listener>();
+  readonly #messages: { from: number; to: number; text: string; tick: number }[] = [];
   readonly clock: Clock;
 
   constructor(
@@ -109,6 +110,10 @@ export class SimulationController {
     switch (`${method} ${path}`) {
       case 'GET /api/state':
         return { status: 200, body: await this.snapshot() };
+      case 'GET /api/messages':
+        return { status: 200, body: this.#messages };
+      case 'POST /api/messages':
+        return this.#message(body);
       case 'POST /api/orders':
         return this.#orders(body);
       case 'POST /api/clock/play':
@@ -144,6 +149,26 @@ export class SimulationController {
     const results = await this.#useCases.executeOrders.execute(line);
     await this.#notify([]);
     return { status: 200, body: results };
+  }
+
+  async #message(body: unknown): Promise<ApiResponse> {
+    const from = numberField(body, 'from');
+    const to = numberField(body, 'to');
+    const text = field(body, 'text')?.trim();
+    if (from === undefined || to === undefined || text === undefined || text.length === 0 || text.length > 240) {
+      return error(400, 'Envie {"from": 1, "to": 2, "text": "mensagem"} com até 240 caracteres.');
+    }
+    const state = await this.#useCases.describeSimulation.execute();
+    const sender = state.robots.find((robot) => robot.id === from);
+    const receiver = state.robots.find((robot) => robot.id === to);
+    if (sender === undefined || receiver === undefined) return error(404, 'Robô não encontrado.');
+    if (Math.abs(sender.map.robot.x - receiver.map.robot.x) + Math.abs(sender.map.robot.y - receiver.map.robot.y) !== 1) {
+      return error(400, 'Os robôs precisam estar lado a lado para trocar mensagens.');
+    }
+    this.#messages.push({ from, to, text, tick: state.tick });
+    if (this.#messages.length > 50) this.#messages.shift();
+    await this.#notify([]);
+    return { status: 200, body: this.#messages };
   }
 
   async #loadScript(id: number, body: unknown): Promise<ApiResponse> {
@@ -267,4 +292,10 @@ function field(body: unknown, name: string): string | undefined {
   }
   const value = (body as Record<string, unknown>)[name];
   return typeof value === 'string' ? value : undefined;
+}
+
+function numberField(body: unknown, name: string): number | undefined {
+  if (typeof body !== 'object' || body === null || !(name in body)) return undefined;
+  const value = (body as Record<string, unknown>)[name];
+  return typeof value === 'number' && Number.isInteger(value) ? value : undefined;
 }
