@@ -49,7 +49,7 @@ export const STOP_USAGE = `Use "${STOP_COMMAND} ID" para parar o programa de um 
 
 export const FORGET_USAGE = `Use "${FORGET_COMMAND} ID" para apagar o mapa de um robô, ex.: ${FORGET_COMMAND} 1`;
 export const STATUS_USAGE = `Use "${STATUS_COMMAND} ID" para ver bateria, compartimento e melhorias de um robô, ex.: ${STATUS_COMMAND} 1`;
-export const UPGRADE_USAGE = `Use "${UPGRADE_COMMAND} ID MELHORIA" (picareta, bateria, compartimento, visao ou armazem), com o robô na base, ex.: ${UPGRADE_COMMAND} 1 picareta`;
+export const UPGRADE_USAGE = `Use "${UPGRADE_COMMAND} ID MELHORIA" (picareta, machado, bateria, compartimento, visao ou armazem), com o robô na base, ex.: ${UPGRADE_COMMAND} 1 picareta`;
 export const SAVE_USAGE = `Use "${SAVE_COMMAND} NOME" para salvar a simulação, ex.: ${SAVE_COMMAND} partida1`;
 export const LOAD_USAGE = `Use "${LOAD_COMMAND} NOME" para carregar uma simulação salva, ex.: ${LOAD_COMMAND} partida1`;
 

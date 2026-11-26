@@ -31,7 +31,7 @@ export function formatWelcome(fleet: FleetDTO, seed: number): string {
     `  ${STOP_COMMAND} ID     para o programa de um robô`,
     `  ${MAP_COMMAND} ID      mostra o mapa de um robô`,
     `  ${STATUS_COMMAND} ID    bateria, compartimento e melhorias do robô, e o armazém`,
-    `  ${UPGRADE_COMMAND} ID M faz a melhoria M com o robô na base (picareta, bateria, compartimento, visao, armazem)`,
+    `  ${UPGRADE_COMMAND} ID M faz a melhoria M com o robô na base (picareta, machado, bateria, compartimento, visao, armazem)`,
     `  ${FORGET_COMMAND} ID    apaga o mapa de um robô`,
     `  ${SAVE_COMMAND} NOME   salva a simulação; ${LOAD_COMMAND} NOME carrega; ${SAVES_COMMAND} lista`,
     `  ${EXIT_COMMAND}         encerra`,

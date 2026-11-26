@@ -35,10 +35,10 @@ export class FakeHost implements RobotHost {
     cargo: 3,
     maxCargo: 10,
     inventory: ['branch', 'stone'],
-    levels: { pickaxe: 1, battery: 0, cargo: 0, vision: 0, warehouse: 2 },
+    levels: { pickaxe: 1, axe: 0, battery: 0, cargo: 0, vision: 0, warehouse: 2 },
   };
   storage: StorageInfo = {
-    items: { branch: 2, stone: 0, log: 1, iron: 0 },
+    items: { branch: 2, stone: 0, log: 1, hardwood: 0, ancientWood: 0, copper: 0, iron: 0, gold: 0, diamond: 0 },
     used: 6,
     capacity: 50,
   };

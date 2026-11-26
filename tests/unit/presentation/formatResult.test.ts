@@ -31,7 +31,7 @@ const event = (body: object): EventDTO =>
 const storage: StorageDTO = {
   used: 0,
   capacity: 50,
-  items: { branch: 0, stone: 0, log: 0, iron: 0 },
+  items: { branch: 0, stone: 0, log: 0, hardwood: 0, ancientWood: 0, copper: 0, iron: 0, gold: 0, diamond: 0 },
 };
 const robot = {
   id: 2,
@@ -49,7 +49,7 @@ describe('formatResult e nomes em português', () => {
     expect(formatRobotState(robot.map.robot)).toContain('Norte');
     expect(unknownRobot(8)).toContain('8');
     expect(itemList(storage.items)).toBe('nada');
-    expect(itemList({ branch: 1, stone: 2, log: 0, iron: 1 })).toBe(
+    expect(itemList({ branch: 1, stone: 2, log: 0, hardwood: 0, ancientWood: 0, copper: 0, iron: 1, gold: 0, diamond: 0 })).toBe(
       '1 galho, 2 pedras, 1 ferro',
     );
     expect(failText('mine', 'nothing')).toContain('jazida');
@@ -196,7 +196,7 @@ describe('formatResult e nomes em português', () => {
         error: 'UPGRADE_FAILED',
         upgrade: 'battery',
         reason: 'missing',
-        missing: { branch: 0, stone: 0, log: 1, iron: 0 },
+        missing: { branch: 0, stone: 0, log: 1, hardwood: 0, ancientWood: 0, copper: 0, iron: 0, gold: 0, diamond: 0 },
       }),
     ).toContain('faltam 1 tronco');
     expect(

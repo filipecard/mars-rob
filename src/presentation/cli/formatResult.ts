@@ -77,10 +77,22 @@ export function formatEvent(event: EventDTO): string | null {
       return null;
     case 'collected':
       return `${name} pegou ${article(event.item)} ${ITEM_NAMES[event.item].one}`;
+    case 'discarded':
+      return `${name} descartou ${String(event.count)} ${ITEM_NAMES[event.item].many} no mapa`;
+    case 'inventoryCleared':
+      return `${name} descartou todo o inventario no mapa (${String(event.count)} itens)`;
     case 'unloaded':
       return `${name} descarregou ${String(event.count)} ${event.count === 1 ? 'item' : 'itens'} no armazém`;
+    case 'warehouseDiscarded':
+      return `${name} descartou ${String(event.count)} ${ITEM_NAMES[event.item].many} do armazem no mapa`;
+    case 'withdrawn':
+      return `${name} retirou ${String(event.count)} ${ITEM_NAMES[event.item].many} do armazem para o compartimento`;
     case 'mined':
-      return `${name} minerou ferro em ${formatPosition(event.at)}${event.depleted ? ' (a jazida acabou)' : ''}`;
+      return `${name} minerou ${ITEM_NAMES[event.item].one} em ${formatPosition(event.at)}${event.depleted ? ' (a jazida acabou)' : ''}`;
+    case 'rockMined':
+      return `${name} quebrou a rocha em ${formatPosition(event.at)}; deixou uma pedra para coletar`;
+    case 'chopped':
+      return `${name} cortou a árvore em ${formatPosition(event.at)} e deixou ${String(event.logs)} ${event.logs === 1 ? 'tronco' : 'troncos'}`;
     case 'upgraded':
       return `${name}: ${UPGRADE_NAMES[event.upgrade]} no nível ${String(event.level)}`;
     case 'failed':

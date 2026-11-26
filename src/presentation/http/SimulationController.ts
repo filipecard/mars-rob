@@ -210,7 +210,7 @@ export class SimulationController {
   async #upgrade(id: number, body: unknown): Promise<ApiResponse> {
     const upgrade = field(body, 'upgrade');
     if (upgrade === undefined) {
-      return error(400, 'Envie {"upgrade": "pickaxe"}');
+      return error(400, 'Envie {"upgrade": "pickaxe"} ou {"upgrade": "axe"}');
     }
     const result = await this.#useCases.upgradeRobot.execute(id, upgrade);
     if (!result.ok) {

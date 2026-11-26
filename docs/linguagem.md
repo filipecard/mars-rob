@@ -1,4 +1,4 @@
-# Linguagem dos robôs
+﻿# Linguagem dos robôs
 
 Scripts com sintaxe parecida com JavaScript. Cada **ação** gasta 1 tick: o script pausa nela e
 continua no tick seguinte. Sensores e contas não gastam tick.
@@ -112,8 +112,13 @@ Cada ação devolve `true` se deu certo e `false` se não deu (ex.: andar contra
 | `face(x, y)`     | gira para olhar para a casa adjacente (x, y)          |
 | `recharge()`     | recarrega na base                                     |
 | `collect()`      | pega o item da casa onde o robô está                  |
-| `unload()`       | descarrega itens no armazém da base                   |
-| `mine()`         | minera a jazida à frente (exige picareta)             |
+| `discard(tipo, quantidade?)` | coloca no mapa os itens escolhidos da mochila; quantidade padrão: 1 |
+| `discardAll()`   | coloca todos os itens da mochila em casas livres no mapa |
+| `withdraw(tipo, quantidade?)` | na base, transfere itens do armazem para a mochila |
+| `discardWarehouse(tipo, quantidade?)` | na base, coloca itens do armazem em casas livres no mapa |
+| `unload()`       | descarrega no armazém da base todos os itens que couberem; pode ser repetido se ainda sobrar carga |
+| `mine()`         | quebra rochas ou minera cobre, ferro, ouro e diamante (exige picareta de nível adequado) |
+| `chop()`         | corta a árvore à frente (exige machado de nível adequado); deixa madeira no chão |
 | `upgrade(tipo)`  | compra uma melhoria na base                           |
 | `stop()`         | encerra o programa (não gasta tick)                   |
 
@@ -142,13 +147,13 @@ lugar, volta a conhecer a própria casa (como visitada) e o 3x3 em volta, igual 
 | `cellAt(x, y)`                           | a casa no mapa do robô (`"unknown"` se ele ainda não viu)                                                  |
 | `explored()`                             | quantas casas o robô já conhece                                                                            |
 | `nearestUnknown()`                       | a casa conhecida e livre mais próxima (em passos) de onde ele vê algo desconhecido, ou `null` (ver abaixo) |
-| `nearestItem(tipo?)`                     | item conhecido e alcançável mais próximo; tipo é opcional (`branch`, `stone`, `log` ou `iron`)             |
+| `nearestItem(tipo?)`                     | item conhecido e alcançável mais próximo; tipo é opcional (galhos, pedras, madeiras e minerais)             |
 | `nearestOre()`                           | jazida conhecida e alcançável mais próxima                                                                 |
 | `battery()`, `maxBattery()`              | carga atual e capacidade da bateria                                                                        |
 | `cargo()`, `maxCargo()`                  | espaço ocupado e capacidade do compartimento do robô                                                       |
-| `inventory()`                            | lista dos itens no compartimento do robô                                                                   |
+| `inventory()`                            | lista os itens da mochila na Saidas e devolve a lista                                                   |
 | `base()`                                 | posição da base (`.x`, `.y`)                                                                               |
-| `warehouse()`                            | armazém da base: campos de itens, `used` e `capacity`                                                      |
+| `warehouse()`                            | lista os itens do armazem na Saidas e devolve os campos `used` e `capacity`                             |
 | `canUpgrade(tipo)`, `level(tipo)`        | se uma melhoria pode ser comprada e o nível atual                                                          |
 | `self`                                   | o próprio robô: `self.id`, `self.position`, `self.orientation` (`"north"`, `"east"`, `"south"`, `"west"`)  |
 
@@ -163,7 +168,7 @@ Uma **casa** tem:
 | `unknownAround` | quantas casas desconhecidas há no 3x3 dela (0 a 9): o que o robô descobriria parando ali |
 | `position`      | a posição (`.x`, `.y`)                                                                   |
 | `robot`         | o ID do robô que está nela, ou `null`                                                    |
-| `item`          | item no chão: `branch`, `stone`, `log` ou `iron`; `null` se não há                       |
+| `item`          | item no chão: galho, pedra, tipo de madeira ou mineral; `null` se não há                 |
 | `obstacle`      | obstáculo: `rock`, `tree` ou `ore`; `null` se não há                                     |
 | `isBase`        | `true` se a casa contém a base                                                           |
 
@@ -215,3 +220,11 @@ dizer "forward"?`. O mesmo vale para campos (`front().isEmty`).
 não uma função: use front().isEmpty, sem os parênteses`.
 - Quem vem de outras linguagens recebe uma dica ao escrever `not`, `and`, `or`, `===`, `!==`,
   `var` ou `const` (use `!`, `&&`, `||`, `==`, `!=` e `let`).
+
+
+
+
+
+No painel **Saidas**, abaixo do editor de scripts, aparecem os retornos das acoes e os valores das funcoes `inventory()` e `warehouse()`.
+
+Capacidade inicial: mochila com 5 espacos e armazem com 10. Cada melhoria acrescenta 5 espacos a mochila ou 10 ao armazem.

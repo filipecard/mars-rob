@@ -98,7 +98,7 @@ describe('World — árvores — RN26', () => {
 
     run(w, 3);
 
-    expect(w.itemCount).toBe(3);
+    expect(w.itemCount).toBe(2);
     for (let x = -5; x <= 5; x++) {
       for (let y = -5; y <= 5; y++) {
         const item = w.itemAt(at(x, y));
@@ -110,7 +110,7 @@ describe('World — árvores — RN26', () => {
     }
   });
 
-  it('ao fim da vida a árvore cai e deixa um tronco em cada casa', () => {
+  it('a árvore não cai pelo tempo; só sai com uma ação explícita de corte', () => {
     const w = world();
     w.plantTree([at(3, 3), at(3, 4)], 2);
 

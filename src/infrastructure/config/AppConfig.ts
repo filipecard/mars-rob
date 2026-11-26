@@ -70,7 +70,7 @@ const SECTIONS = ['obstaculos', 'bateria', 'armazenamento', 'mundo'];
 //   "limite": 30, "robos": 1, "obstaculos": { "quantidade": 20, "tamanhoMaximo": 8 },
 //   "semente": null,
 //   "bateria": { "maxima": 100, "recargaPorTick": 20, "solarACadaTicks": 5 },
-//   "armazenamento": { "robo": 10, "armazem": 50 },
+//   "armazenamento": { "robo": 5, "armazem": 10 },
 //   "mundo": { "pedras": 40, "arvoresIniciais": 10, "minerios": 6, ... }
 // }
 export function parseConfig(raw: unknown): ConfigResult {

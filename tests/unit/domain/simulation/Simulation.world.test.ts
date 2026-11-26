@@ -140,12 +140,14 @@ describe('Simulation — bateria, coleta, mineração e melhorias', () => {
       ),
     ).toBe(true);
     simulation.fleet.robot(1).applyUpgrade('pickaxe');
+    simulation.fleet.robot(1).applyUpgrade('pickaxe');
     const mined = run(simulation, 'mine()');
     expect(
       mined.some((event) => event.kind === 'mined' && event.depleted),
     ).toBe(true);
     const full = setup({ cargo: 2, position: at(2, 0) });
     full.world.addOre(at(2, 1), 2);
+    full.simulation.fleet.robot(1).applyUpgrade('pickaxe');
     full.simulation.fleet.robot(1).applyUpgrade('pickaxe');
     expect(
       run(full.simulation, 'mine()').some(

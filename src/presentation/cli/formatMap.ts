@@ -33,7 +33,12 @@ const ITEM_SYMBOLS: Record<ItemDTO, string> = {
   branch: ',',
   stone: 'o',
   log: '=',
+  hardwood: 'H',
+  ancientWood: 'A',
+  copper: 'c',
   iron: '%',
+  gold: 'G',
+  diamond: 'D',
 };
 
 export function formatLegend({ robot }: MapDTO): string {

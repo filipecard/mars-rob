@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
-import { lastErrors, type ScriptErrorInfo } from '../logic/events.js';
+import { describeEvent, lastErrors, type ScriptErrorInfo } from '../logic/events.js';
 import type { UpdateMessage } from './types.js';
 
 export type Connection = 'connecting' | 'open' | 'closed';
 
 export interface SimulationView {
   update: UpdateMessage | null;
+  outputs: { tick: number; robot: number; text: string }[];
   // Último erro de execução de cada robô (some ao rodar outro script)
   errors: ReadonlyMap<number, ScriptErrorInfo>;
   connection: Connection;
   clearError: (robotId: number) => void;
+  clearOutputs: (robotId: number) => void;
 }
 
 const RETRY_MS = 1500;
@@ -21,6 +23,7 @@ export function useSimulation(): SimulationView {
     () => new Map(),
   );
   const [connection, setConnection] = useState<Connection>('connecting');
+  const [outputs, setOutputs] = useState<{ tick: number; robot: number; text: string }[]>([]);
 
   useEffect(() => {
     let socket: WebSocket | null = null;
@@ -37,6 +40,13 @@ export function useSimulation(): SimulationView {
       socket.onmessage = (message: MessageEvent<string>) => {
         const data = JSON.parse(message.data) as UpdateMessage;
         setUpdate(data);
+        const lines = data.events.flatMap((event) => {
+          const described = describeEvent(event);
+          return described.tone === 'quiet'
+            ? []
+            : [{ tick: event.tick, robot: event.robot, text: described.text }];
+        });
+        if (lines.length > 0) setOutputs((current) => [...current, ...lines].slice(-300));
         if (data.events.length === 0) {
           return;
         }
@@ -71,5 +81,9 @@ export function useSimulation(): SimulationView {
     });
   };
 
-  return { update, errors, connection, clearError };
+  const clearOutputs = (robotId: number): void => {
+    setOutputs((current) => current.filter((line) => line.robot !== robotId));
+  };
+
+  return { update, errors, outputs, connection, clearError, clearOutputs };
 }

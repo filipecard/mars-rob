@@ -1,4 +1,4 @@
-// Referência da linguagem dos robôs: alimenta o painel de ajuda e o autocomplete.
+﻿// Referência da linguagem dos robôs: alimenta o painel de ajuda e o autocomplete.
 // Mesmo conteúdo de docs/linguagem.md (um teste na raiz confere se nada ficou de fora).
 
 export type EntryKind =
@@ -118,6 +118,34 @@ export const ENTRIES: readonly Entry[] = [
     params: 0,
   },
   {
+    name: 'discard',
+    kind: 'action',
+    signature: 'discard(tipo, quantidade?)',
+    description: 'Remove do inventário a quantidade informada do item; por padrão, remove 1.',
+    params: 2,
+  },
+  {
+    name: 'discardAll',
+    kind: 'action',
+    signature: 'discardAll()',
+    description: 'Esvazia o inventário do robô.',
+    params: 0,
+  },
+  {
+    name: 'withdraw',
+    kind: 'action',
+    signature: 'withdraw(tipo, quantidade?)',
+    description: 'Na base, transfere a quantidade selecionada do armazem para a mochila, se houver espaco.',
+    params: 2,
+  },
+  {
+    name: 'discardWarehouse',
+    kind: 'action',
+    signature: 'discardWarehouse(tipo, quantidade?)',
+    description: 'Na base, coloca a quantidade selecionada do armazem em casas livres no mapa.',
+    params: 2,
+  },
+  {
     name: 'unload',
     kind: 'action',
     signature: 'unload()',
@@ -128,7 +156,14 @@ export const ENTRIES: readonly Entry[] = [
     name: 'mine',
     kind: 'action',
     signature: 'mine()',
-    description: 'Minera a jazida à frente; exige picareta.',
+    description: 'Quebra uma rocha ou minera uma jazida à frente; exige picareta. Rochas deixam uma pedra pequena para coletar.',
+    params: 0,
+  },
+  {
+    name: 'chop',
+    kind: 'action',
+    signature: 'chop()',
+    description: 'Corta a árvore à frente com o machado; cada casa da árvore deixa um tronco no chão.',
     params: 0,
   },
   {
@@ -260,7 +295,7 @@ export const ENTRIES: readonly Entry[] = [
     name: 'inventory',
     kind: 'sensor',
     signature: 'inventory()',
-    description: 'Lista dos itens carregados pelo robô.',
+    description: 'Lista os itens da mochila na Saidas e devolve a lista.',
     params: 0,
   },
   {
@@ -274,7 +309,7 @@ export const ENTRIES: readonly Entry[] = [
     name: 'warehouse',
     kind: 'sensor',
     signature: 'warehouse()',
-    description: 'Itens, espaço usado e capacidade do armazém da base.',
+    description: 'Lista os itens do armazem na Saidas e devolve o registro com used e capacity.',
     params: 0,
   },
   {
@@ -490,7 +525,7 @@ export const ENTRIES: readonly Entry[] = [
     name: 'item',
     kind: 'cellField',
     signature: 'casa.item',
-    description: 'Item no chão (branch, stone, log ou iron), ou null.',
+    description: 'Item no chão (galho, pedra, tronco, madeiras nobres ou minerais), ou null.',
   },
   {
     name: 'obstacle',

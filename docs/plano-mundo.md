@@ -71,9 +71,9 @@ O mundo avança a cada tick do relógio (no servidor, mesmo sem programa rodando
   1. surge como muda (obstáculo de 1 casa) numa casa livre;
   2. cresce por estágios e ocupa mais casas em volta (até 3x3);
   3. enquanto vive, solta galhos nas casas livres vizinhas de tempos em tempos;
-  4. depois de um tempo, cai: libera as casas e deixa troncos no lugar.
+  4. só é cortada pela ação `chop()`: libera as casas e deixa a madeira da espécie no chão.
 - **Jazida de minério:** surge ao lado das rochas e é um obstáculo. `mine()` minera a casa da frente,
-  precisa da ferramenta **picareta** e solta minério de ferro. A jazida se esgota depois de N usos.
+  precisa de picareta do nível adequado e pode render cobre, ferro, ouro ou diamante.
 - **Pedras:** espalhadas no começo e, às vezes, soltas quando a jazida se esgota.
 - **Regras que continuam valendo:** o mundo não pode bloquear o acesso a partes da malha (RN11).
   Nada cresce em cima de robô, da base, de item ou nas casas em volta da base.
@@ -87,6 +87,7 @@ São compradas com o que está no armazém da base, pelo script (`upgrade("batte
 | Melhoria         | Efeito                          | Custo (proposta)     |
 | ---------------- | ------------------------------- | -------------------- |
 | picareta         | permite `mine()`                | 3 galhos + 2 pedras  |
+| machado          | permite `chop()`                | 4 galhos + 2 pedras  |
 | bateria +50      | carga máxima                    | 4 ferros + 2 troncos |
 | compartimento +5 | armazenamento do robô           | 3 troncos + 2 ferros |
 | visão 5x5        | raio da visão passa de 1 para 2 | 6 ferros             |

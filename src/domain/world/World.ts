@@ -41,10 +41,10 @@ export const DEFAULT_WORLD_SETTINGS: WorldSettings = {
   maxOres: 10,
   treeGrowEvery: 30,
   treeMaxCells: 5,
-  branchEvery: 40,
+  branchEvery: 20,
   treeLifespan: 400,
   oreUses: 3,
-  warehouse: 50,
+  warehouse: 10,
 };
 
 // Mundo parado: só a malha e a base (usado quando a frota recebe uma Grid pronta)
@@ -61,21 +61,27 @@ export const STATIC_WORLD_SETTINGS: WorldSettings = {
   branchEvery: 0,
   treeLifespan: 0,
   oreUses: 3,
-  warehouse: 50,
+  warehouse: 10,
 };
 
 const PLACEMENT_ATTEMPTS = 30;
+const RANDOM_BRANCH_EVERY = 20;
+const RANDOM_BRANCH_CHANCE = 0.3;
+const MAX_BRANCHES_PER_TREE = 2;
+const BRANCH_RADIUS = 2;
 
 interface Tree {
   cells: Position[];
   age: number;
   // 0: não cai
   lifespan: number;
+  wood: 'log' | 'hardwood' | 'ancientWood';
 }
 
 interface Ore {
   position: Position;
   remaining: number;
+  mineral: 'copper' | 'iron' | 'gold' | 'diamond';
 }
 
 export interface MineResult {
@@ -86,10 +92,12 @@ export interface MineResult {
 
 // Para salvar e carregar (RN30)
 export interface WorldSnapshot {
+  ticks?: number;
   grid: { min: number; max: number; obstacles: [number, number][][] };
   settings: WorldSettings;
-  trees: { cells: [number, number][]; age: number; lifespan: number }[];
-  ores: { x: number; y: number; remaining: number }[];
+  trees: { cells: [number, number][]; age: number; lifespan: number; wood?: Tree['wood'] }[];
+  ores: { x: number; y: number; remaining: number; mineral?: Ore['mineral'] }[];
+  minedRocks?: [number, number][];
   items: { x: number; y: number; item: ItemKind }[];
   warehouse: ItemCounts;
   warehouseLevel: number;
@@ -109,9 +117,11 @@ export class World implements Terrain {
   readonly #trees = new Set<Tree>();
   readonly #treeAt = new Map<string, Tree>();
   readonly #ores = new Map<string, Ore>();
+  readonly #minedRocks = new Set<string>();
   readonly #items = new Map<string, ItemKind>();
   readonly #specialGround = new Map<string, 'sand' | 'ice'>();
   #warehouseLevel = 0;
+  #ticks = 0;
 
   private constructor(grid: Grid, settings: WorldSettings, random: Random) {
     this.grid = grid;
@@ -144,16 +154,21 @@ export class World implements Terrain {
       obstacles.map((cells) => Obstacle.create(cells.map(toPosition))),
     );
     const world = new World(grid, snapshot.settings, random);
+    world.#ticks = snapshot.ticks ?? 0;
+    for (const [x, y] of snapshot.minedRocks ?? []) {
+      world.#minedRocks.add(keyOf({ x, y }));
+    }
     for (const tree of snapshot.trees) {
       world.#addTree({
         cells: tree.cells.map(toPosition),
         age: tree.age,
         lifespan: tree.lifespan,
+        wood: tree.wood ?? 'log',
       });
     }
-    for (const { x, y, remaining } of snapshot.ores) {
+    for (const { x, y, remaining, mineral } of snapshot.ores) {
       const position = Position.create(x, y);
-      world.#ores.set(keyOf(position), { position, remaining });
+      world.#ores.set(keyOf(position), { position, remaining, mineral: mineral ?? 'iron' });
     }
     for (const { x, y, item } of snapshot.items) {
       world.#items.set(keyOf({ x, y }), item);
@@ -180,16 +195,23 @@ export class World implements Terrain {
         ),
       },
       settings: this.settings,
-      trees: [...this.#trees].map(({ cells, age, lifespan }) => ({
+      ticks: this.#ticks,
+      trees: [...this.#trees].map(({ cells, age, lifespan, wood }) => ({
         cells: cells.map(toPair),
         age,
         lifespan,
+        wood,
       })),
-      ores: [...this.#ores.values()].map(({ position, remaining }) => ({
+      ores: [...this.#ores.values()].map(({ position, remaining, mineral }) => ({
         x: position.x,
         y: position.y,
         remaining,
+        mineral,
       })),
+      minedRocks: [...this.#minedRocks].map((key) => {
+        const [x = 0, y = 0] = key.split(',').map(Number);
+        return [x, y] as [number, number];
+      }),
       items: [...this.#items].map(([key, item]) => {
         const [x = 0, y = 0] = key.split(',').map(Number);
         return { x, y, item };
@@ -231,7 +253,7 @@ export class World implements Terrain {
   isBlocked(position: Position): boolean {
     const key = keyOf(position);
     return (
-      this.grid.isBlocked(position) ||
+      (this.grid.isBlocked(position) && !this.#minedRocks.has(key)) ||
       this.#treeAt.has(key) ||
       this.#ores.has(key)
     );
@@ -275,10 +297,60 @@ export class World implements Terrain {
     return true;
   }
 
+  // Deposita os itens em casas livres, sem alterar a lista se não couberem todos.
+  placeItemsNearby(
+    center: Position,
+    items: readonly ItemKind[],
+    occupied: (position: Position) => boolean = () => false,
+  ): boolean {
+    const cells: Position[] = [];
+    for (let y = this.min; y <= this.max; y++) {
+      for (let x = this.min; x <= this.max; x++) {
+        const position = Position.create(x, y);
+        if (
+          !position.equals(center) &&
+          !this.isBlocked(position) &&
+          !this.#items.has(keyOf(position)) &&
+          !occupied(position)
+        ) cells.push(position);
+      }
+    }
+    cells.sort((a, b) =>
+      Math.abs(a.x - center.x) + Math.abs(a.y - center.y) -
+      (Math.abs(b.x - center.x) + Math.abs(b.y - center.y)) ||
+      a.y - b.y || a.x - b.x,
+    );
+    if (cells.length < items.length) return false;
+    items.forEach((item, index) => this.#items.set(keyOf(cells[index]!), item));
+    return true;
+  }
+
   // --- jazidas (RN27)
 
   isOre(position: Position): boolean {
     return this.#ores.has(keyOf(position));
+  }
+
+  oreMineral(position: Position): Ore['mineral'] | null {
+    return this.#ores.get(keyOf(position))?.mineral ?? null;
+  }
+
+  treeWood(position: Position): Tree['wood'] | null {
+    return this.#treeAt.get(keyOf(position))?.wood ?? null;
+  }
+
+  isRock(position: Position): boolean {
+    const key = keyOf(position);
+    return this.grid.isBlocked(position) && !this.#minedRocks.has(key);
+  }
+
+  // Quebra uma rocha e deixa uma pedra pequena no chÃ£o para coletar.
+  mineRock(position: Position): boolean {
+    if (!this.isRock(position)) return false;
+    const key = keyOf(position);
+    this.#minedRocks.add(key);
+    this.placeItem(position, 'stone');
+    return true;
   }
 
   // Tira um minério da jazida. Quando ela acaba, a casa fica livre com uma pedra.
@@ -289,11 +361,20 @@ export class World implements Terrain {
     }
     ore.remaining--;
     if (ore.remaining > 0) {
-      return { item: 'iron', depleted: false };
+      return { item: ore.mineral, depleted: false };
     }
     this.#ores.delete(keyOf(position));
     this.placeItem(position, 'stone');
-    return { item: 'iron', depleted: true };
+    return { item: ore.mineral, depleted: true };
+  }
+
+  // Corta a árvore inteira e deixa um tronco em cada casa que ela ocupava.
+  chop(position: Position): { logs: number; wood: Tree['wood'] } | null {
+    const tree = this.#treeAt.get(keyOf(position));
+    if (tree === undefined) return null;
+    const result = { logs: tree.cells.length, wood: tree.wood };
+    this.#fell(tree);
+    return result;
   }
 
   // RN28
@@ -306,6 +387,7 @@ export class World implements Terrain {
 
   // Um tick do mundo. `isOccupied` diz onde há robô: nada cresce em cima dele.
   advance(isOccupied: (position: Position) => boolean): void {
+    this.#ticks++;
     const { treeGrowEvery, treeMaxCells, branchEvery } = this.settings;
     for (const tree of [...this.#trees]) {
       tree.age++;
@@ -320,12 +402,23 @@ export class World implements Terrain {
       ) {
         this.#grow(tree, isOccupied);
       }
-      if (
-        branchEvery > 0 &&
-        tree.cells.length >= 3 &&
-        tree.age % branchEvery === 0
-      ) {
+      if (branchEvery > 0 && tree.age % branchEvery === 0) {
         this.#dropBranch(tree, isOccupied);
+      }
+    }
+    if (
+      branchEvery > 0 &&
+      this.#ticks % RANDOM_BRANCH_EVERY === 0 &&
+      this.#random() < RANDOM_BRANCH_CHANCE
+    ) {
+      const spot = this.#randomCell();
+      if (
+        !this.isBlocked(spot) &&
+        !this.#items.has(keyOf(spot)) &&
+        !this.isBase(spot) &&
+        !isOccupied(spot)
+      ) {
+        this.placeItem(spot, 'branch');
       }
     }
     const { treeEvery, maxTrees, oreEvery, maxOres } = this.settings;
@@ -346,23 +439,23 @@ export class World implements Terrain {
   }
 
   // Para testes e cenários: uma árvore nas casas dadas (respeitando RN11)
-  plantTree(cells: readonly Position[], lifespan = 0): void {
+  plantTree(cells: readonly Position[], lifespan = 0, wood: Tree['wood'] = 'log'): void {
     if (!this.#canBlock(cells, () => false)) {
       throw new RangeError('Não dá para plantar a árvore nessas casas');
     }
-    this.#addTree({ cells: [...cells], age: 0, lifespan });
+    this.#addTree({ cells: [...cells], age: 0, lifespan, wood });
   }
 
-  addOre(position: Position, remaining = this.settings.oreUses): void {
+  addOre(position: Position, remaining = this.settings.oreUses, mineral: Ore['mineral'] = 'iron'): void {
     if (!this.#canBlock([position], () => false)) {
       throw new RangeError('Não dá para pôr a jazida nessa casa');
     }
-    this.#ores.set(keyOf(position), { position, remaining });
+    this.#ores.set(keyOf(position), { position, remaining, mineral });
   }
 
   #groundAt(position: Position): Ground {
     const key = keyOf(position);
-    if (this.grid.isBlocked(position)) {
+    if (this.isRock(position)) {
       return 'rock';
     }
     if (this.#treeAt.has(key)) {
@@ -375,7 +468,7 @@ export class World implements Terrain {
   }
 
   #populate(): void {
-    const { stones, initialTrees, initialOres, treeMaxCells, treeLifespan } =
+    const { stones, initialTrees, initialOres, treeMaxCells } =
       this.settings;
     let placed = 0;
     for (let i = 0; i < stones * 20 && placed < stones; i++) {
@@ -390,7 +483,6 @@ export class World implements Terrain {
         continue;
       }
       // Árvores de idades e tamanhos variados
-      tree.age = Math.floor((this.#random() * treeLifespan) / 2);
       const extra = Math.floor(this.#random() * treeMaxCells);
       for (let g = 0; g < extra && tree.cells.length < treeMaxCells; g++) {
         this.#grow(tree, () => false);
@@ -416,7 +508,9 @@ export class World implements Terrain {
           treeLifespan === 0
             ? 0
             : treeLifespan + Math.floor((this.#random() * treeLifespan) / 2);
-        const tree: Tree = { cells: [cell], age: 0, lifespan };
+        const roll = this.#random();
+        const wood = roll < 0.6 ? 'log' : roll < 0.9 ? 'hardwood' : 'ancientWood';
+        const tree: Tree = { cells: [cell], age: 0, lifespan, wood };
         this.#addTree(tree);
         return tree;
       }
@@ -431,9 +525,12 @@ export class World implements Terrain {
       const rock = pick(rocks, this.#random);
       const cell = rock && pick(sideNeighbors(rock), this.#random);
       if (cell !== undefined && this.#canBlock([cell], isOccupied)) {
+        const roll = this.#random();
+        const mineral = roll < 0.5 ? 'copper' : roll < 0.82 ? 'iron' : roll < 0.96 ? 'gold' : 'diamond';
         this.#ores.set(keyOf(cell), {
           position: cell,
           remaining: this.settings.oreUses,
+          mineral,
         });
         return;
       }
@@ -463,10 +560,20 @@ export class World implements Terrain {
 
   // RN26: um galho numa casa livre em volta da árvore (inclusive na diagonal)
   #dropBranch(tree: Tree, isOccupied: (position: Position) => boolean): void {
+    let nearbyBranches = 0;
+    for (const [key, item] of this.#items) {
+      if (item !== 'branch') continue;
+      const [x = 0, y = 0] = key.split(',').map(Number);
+      if (tree.cells.some((cell) => Math.abs(cell.x - x) <= BRANCH_RADIUS && Math.abs(cell.y - y) <= BRANCH_RADIUS)) {
+        nearbyBranches++;
+      }
+    }
+    if (nearbyBranches >= MAX_BRANCHES_PER_TREE) return;
+
     const around = tree.cells.flatMap((cell) => {
       const result: Position[] = [];
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -BRANCH_RADIUS; dx <= BRANCH_RADIUS; dx++) {
+        for (let dy = -BRANCH_RADIUS; dy <= BRANCH_RADIUS; dy++) {
           result.push(cell.translate(dx, dy));
         }
       }
@@ -493,7 +600,7 @@ export class World implements Terrain {
       this.#treeAt.delete(keyOf(cell));
     }
     for (const cell of tree.cells) {
-      this.placeItem(cell, 'log');
+      this.placeItem(cell, tree.wood);
     }
   }
 
@@ -525,7 +632,9 @@ export class World implements Terrain {
 
   #blockedKeys(): Set<string> {
     const keys = new Set(
-      this.grid.obstacles.flatMap((obstacle) => obstacle.cells.map(keyOf)),
+      this.grid.obstacles
+        .flatMap((obstacle) => obstacle.cells.map(keyOf))
+        .filter((key) => !this.#minedRocks.has(key)),
     );
     for (const key of this.#treeAt.keys()) {
       keys.add(key);

@@ -75,16 +75,28 @@ export function describeEvent(event: EventDTO): {
       };
     case 'collected':
       return { text: `coletou ${itemName(event.item)}`, tone: 'info' };
+    case 'discarded':
+      return { text: `descartou ${String(event.count)} ${itemName(event.item)} no mapa`, tone: 'info' };
+    case 'inventoryCleared':
+      return { text: `descartou no mapa todo o inventário (${String(event.count)} itens)`, tone: 'info' };
     case 'unloaded':
       return {
         text: `descarregou ${String(event.count)} itens na base`,
         tone: 'info',
       };
+    case 'warehouseDiscarded':
+      return { text: `descartou ${String(event.count)} ${itemName(event.item)} do armazem no mapa`, tone: 'info' };
+    case 'withdrawn':
+      return { text: `retirou ${String(event.count)} ${itemName(event.item)} do armazem para o inventario`, tone: 'info' };
     case 'mined':
       return {
         text: `minerou ${itemName(event.item)} em ${at(event.at)}${event.depleted ? '; jazida esgotada' : ''}`,
         tone: 'info',
       };
+    case 'rockMined':
+      return { text: `quebrou a rocha em ${at(event.at)}; deixou uma pedra para coletar`, tone: 'info' };
+    case 'chopped':
+      return { text: `cortou a árvore em ${at(event.at)}; deixou ${String(event.logs)} ${event.logs === 1 ? 'tronco' : 'troncos'}`, tone: 'info' };
     case 'upgraded':
       return {
         text: `melhoria ${upgradeName(event.upgrade)} no nível ${String(event.level)}`,
@@ -114,6 +126,11 @@ function itemName(item: ItemDTO): string {
         branch: 'galho',
         stone: 'pedra',
         log: 'tronco',
+        hardwood: 'madeira nobre',
+        ancientWood: 'madeira ancestral',
+        copper: 'cobre',
+        gold: 'ouro',
+        diamond: 'diamante',
         iron: 'minério de ferro',
       } as Record<string, string>
     )[item] ?? item
@@ -125,6 +142,7 @@ function upgradeName(upgrade: UpgradeDTO): string {
     (
       {
         pickaxe: 'picareta',
+        axe: 'machado',
         battery: 'bateria',
         cargo: 'compartimento',
         vision: 'visão',
@@ -140,8 +158,13 @@ function actionName(action: ActionDTO): string {
       {
         recharge: 'recarga',
         collect: 'coleta',
+        discard: 'remoção de itens',
+        discardAll: 'esvaziamento do inventário',
+        discardWarehouse: 'descarte do armazem',
+        withdraw: 'retirada do armazem',
         unload: 'descarga',
         mine: 'mineração',
+        chop: 'corte de árvore',
         upgrade: 'melhoria',
       } as Record<string, string>
     )[action] ?? action

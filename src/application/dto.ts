@@ -24,11 +24,11 @@ import type { World } from '../domain/world/World.js';
 export type OrientationDTO = 'N' | 'L' | 'S' | 'O';
 
 // RN25: galho, pedra, tronco e minério de ferro
-export type ItemDTO = 'branch' | 'stone' | 'log' | 'iron';
+export type ItemDTO = 'branch' | 'stone' | 'log' | 'hardwood' | 'ancientWood' | 'copper' | 'iron' | 'gold' | 'diamond';
 
 // RN28: picareta, bateria, compartimento, visão e armazém
 export type UpgradeDTO =
-  'pickaxe' | 'battery' | 'cargo' | 'vision' | 'warehouse';
+  'pickaxe' | 'axe' | 'battery' | 'cargo' | 'vision' | 'warehouse';
 
 export type GroundDTO = 'free' | 'base' | 'rock' | 'tree' | 'ore' | 'sand' | 'ice';
 
@@ -200,8 +200,14 @@ export type EventDTO = { tick: number; robot: number } & (
   | { kind: 'forgot'; forgotten: number }
   | { kind: 'recharged'; added: number; battery: number }
   | { kind: 'collected'; item: ItemDTO }
+  | { kind: 'discarded'; item: ItemDTO; count: number }
+  | { kind: 'inventoryCleared'; count: number }
+  | { kind: 'warehouseDiscarded'; item: ItemDTO; count: number }
+  | { kind: 'withdrawn'; item: ItemDTO; count: number }
   | { kind: 'unloaded'; count: number }
   | { kind: 'mined'; item: ItemDTO; at: PositionDTO; depleted: boolean }
+  | { kind: 'rockMined'; at: PositionDTO }
+  | { kind: 'chopped'; logs: number; wood?: ItemDTO; at: PositionDTO }
   | { kind: 'upgraded'; upgrade: UpgradeDTO; level: number }
   | { kind: 'failed'; action: ActionDTO; reason: FailReasonDTO }
   | { kind: 'printed'; text: string }
@@ -221,8 +227,13 @@ export type ActionDTO =
   | 'forgetMap'
   | 'recharge'
   | 'collect'
+  | 'discard'
+  | 'discardAll'
+  | 'discardWarehouse'
+  | 'withdraw'
   | 'unload'
   | 'mine'
+  | 'chop'
   | 'upgrade';
 
 export type FailReasonDTO =
@@ -269,6 +280,8 @@ export function toEventDTO(event: SimulationEvent): EventDTO {
       return { ...event, position: toPositionDTO(event.position) };
     case 'blocked':
     case 'mined':
+    case 'chopped':
+    case 'rockMined':
       return { ...event, at: toPositionDTO(event.at) };
     default:
       return { ...event };

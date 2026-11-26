@@ -48,8 +48,13 @@ export const BUILTIN_NAMES = [
   'face',
   'recharge',
   'collect',
+  'discard',
+  'discardAll',
+  'discardWarehouse',
+  'withdraw',
   'unload',
   'mine',
+  'chop',
   'upgrade',
   'stop',
   'front',
@@ -182,8 +187,25 @@ export function builtinScope(host: RobotHost): Scope {
   });
   action('recharge', { kind: 'recharge' });
   action('collect', { kind: 'collect' });
+  define('discard', 1, 2, function* ([item, countValue], location): Execution {
+    const count = countValue === undefined ? 1 : integer(countValue, location);
+    if (count < 1) throw new ScriptRuntimeError('a quantidade deve ser maior que zero', location);
+    return yield { kind: 'discard', item: itemKind(item ?? null, location), count };
+  });
+  action('discardAll', { kind: 'discardAll' });
+  define('discardWarehouse', 1, 2, function* ([item, countValue], location): Execution {
+    const count = countValue === undefined ? 1 : integer(countValue, location);
+    if (count < 1) throw new ScriptRuntimeError('a quantidade deve ser maior que zero', location);
+    return yield { kind: 'discardWarehouse', item: itemKind(item ?? null, location), count };
+  });
+  define('withdraw', 1, 2, function* ([item, countValue], location): Execution {
+    const count = countValue === undefined ? 1 : integer(countValue, location);
+    if (count < 1) throw new ScriptRuntimeError('a quantidade deve ser maior que zero', location);
+    return yield { kind: 'withdraw', item: itemKind(item ?? null, location), count };
+  });
   action('unload', { kind: 'unload' });
   action('mine', { kind: 'mine' });
+  action('chop', { kind: 'chop' });
   define('upgrade', 1, 1, function* ([kind], location): Execution {
     return yield {
       kind: 'upgrade',
@@ -271,15 +293,30 @@ export function builtinScope(host: RobotHost): Scope {
   status('maxBattery', () => host.status().maxBattery);
   status('cargo', () => host.status().cargo);
   status('maxCargo', () => host.status().maxCargo);
-  status('inventory', () => ({
-    kind: 'list',
-    items: host.status().inventory,
-  }));
+  define(
+    'inventory',
+    0,
+    0,
+    pure(() => {
+      const value = { kind: 'list' as const, items: host.status().inventory };
+      host.print(`inventario: ${toText(value)}`);
+      return value;
+    }),
+  );
   status('base', () => {
     const { x, y } = host.base();
     return positionRecord(x, y);
   });
-  status('warehouse', () => storageRecord(host.warehouse()));
+  define(
+    'warehouse',
+    0,
+    0,
+    pure(() => {
+      const value = storageRecord(host.warehouse());
+      host.print(`armazem: ${toText(value)}`);
+      return value;
+    }),
+  );
   define(
     'canUpgrade',
     1,

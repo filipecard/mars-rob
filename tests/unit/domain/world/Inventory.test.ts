@@ -31,7 +31,12 @@ describe('Inventory — RN25', () => {
       branch: 1,
       stone: 1,
       log: 0,
+      hardwood: 0,
+      ancientWood: 0,
+      copper: 0,
       iron: 0,
+      gold: 0,
+      diamond: 0,
     });
     expect(inventory.take({ branch: 3 })).toBe(false);
     expect(inventory.take({ branch: 2 })).toBe(true);
@@ -48,9 +53,14 @@ describe('Inventory — RN25', () => {
       branch: 1,
       stone: 0,
       log: 2,
+      hardwood: 0,
+      ancientWood: 0,
+      copper: 0,
       iron: 0,
+      gold: 0,
+      diamond: 0,
     });
-    expect(cargo.counts()).toEqual({ branch: 1, stone: 0, log: 0, iron: 0 });
+    expect(cargo.counts()).toEqual({ branch: 1, stone: 0, log: 0, hardwood: 0, ancientWood: 0, copper: 0, iron: 0, gold: 0, diamond: 0 });
   });
 
   it('recusa capacidade inválida e itens que não cabem', () => {
@@ -70,8 +80,13 @@ describe('Inventory — RN25', () => {
     expect(upgradeCost('battery', 2)).toEqual({
       branch: 0,
       stone: 0,
-      log: 4,
-      iron: 8,
+      log: 0,
+      hardwood: 2,
+      ancientWood: 0,
+      copper: 3,
+      iron: 0,
+      gold: 0,
+      diamond: 0,
     });
   });
 });

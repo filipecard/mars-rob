@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import type { ApiClient } from '../api/client.js';
 import type { RobotStatusDTO } from '../api/types.js';
 import type { ScriptErrorInfo } from '../logic/events.js';
@@ -10,9 +11,12 @@ import { ScriptEditor } from './ScriptEditor.js';
 
 interface Props {
   robot: RobotStatusDTO;
+  outputs: { tick: number; robot: number; text: string }[];
   api: ApiClient;
+  baseMenu: ReactNode;
   runtimeError: ScriptErrorInfo | null;
   onClearError: () => void;
+  onClearOutputs: (robotId: number) => void;
 }
 
 const PROGRAM_LABELS = {
@@ -20,7 +24,7 @@ const PROGRAM_LABELS = {
   script: 'Rodando script',
 } as const;
 
-export function RobotPanel({ robot, api, runtimeError, onClearError }: Props) {
+export function RobotPanel({ robot, outputs, api, baseMenu, runtimeError, onClearError, onClearOutputs }: Props) {
   const [source, setSource] = useState(() =>
     loadSavedScript(localStorage, robot.id),
   );
@@ -46,6 +50,7 @@ export function RobotPanel({ robot, api, runtimeError, onClearError }: Props) {
   };
 
   const run = async (): Promise<void> => {
+    onClearOutputs(robot.id);
     const result = await api.loadScript(robot.id, source);
     onClearError();
     setSyntaxError(
@@ -73,6 +78,7 @@ export function RobotPanel({ robot, api, runtimeError, onClearError }: Props) {
           <button type="button" aria-pressed={planning} onClick={() => { setPlanning(!planning); setRouteMessage(''); }}>{planning ? 'Cancelar rota' : 'Planejar rota'}</button>
           <MapGrid
             map={map}
+            overlay={baseMenu}
             onCellClick={(x, y) => {
               if (planning) {
                 const commands = routeCommands(map, { x, y });
@@ -115,8 +121,7 @@ export function RobotPanel({ robot, api, runtimeError, onClearError }: Props) {
               Bateria: {robot.battery}/{robot.maxBattery}
             </p>
             <p>
-              Compartimento: {robot.cargo.used}/{robot.cargo.capacity} espaços ·{' '}
-              {formatItems(robot.cargo.items)}
+              Compartimento: {robot.cargo.used}/{robot.cargo.capacity} espaços
             </p>
             <UpgradePanel robot={robot} api={api} />
           </section>
@@ -158,6 +163,17 @@ export function RobotPanel({ robot, api, runtimeError, onClearError }: Props) {
               linha {error.line}, coluna {error.column}: {error.message}
             </p>
           )}
+          <section className="script-output" aria-label={`Saídas do robô ${robot.id}`}>
+            <header>
+              <h3>Saídas</h3>
+              <button type="button" disabled={!outputs.some((line) => line.robot === robot.id)} onClick={() => onClearOutputs(robot.id)}>Limpar</button>
+            </header>
+            {outputs.filter((line) => line.robot === robot.id).length === 0 ? (
+              <p className="script-output-empty">Chame <code>inventory()</code> ou <code>warehouse()</code> no script para listar os itens aqui.</p>
+            ) : (
+              <ol>{outputs.filter((line) => line.robot === robot.id).map((line, index) => <li key={`${line.tick}-${index}`}><small>tick {line.tick}</small><code>{line.text}</code></li>)}</ol>
+            )}
+          </section>
         </section>
       </div>
     </article>
@@ -166,10 +182,11 @@ export function RobotPanel({ robot, api, runtimeError, onClearError }: Props) {
 
 const UPGRADE_NAMES: Record<string, string> = {
   pickaxe: 'Picareta',
+  axe: 'Machado',
   battery: 'Bateria +50',
   cargo: 'Compartimento +5',
   vision: 'Visão 5×5',
-  warehouse: 'Armazém +50',
+  warehouse: 'Armazem +10',
 };
 
 function UpgradePanel({
@@ -225,7 +242,12 @@ function formatItems(items: Record<string, number>): string {
     branch: 'galhos',
     stone: 'pedras',
     log: 'troncos',
+    hardwood: 'madeira nobre',
+    ancientWood: 'madeira ancestral',
+    copper: 'cobre',
     iron: 'ferros',
+    gold: 'ouro',
+    diamond: 'diamantes',
   };
   const list = Object.entries(items)
     .filter(([, count]) => count > 0)

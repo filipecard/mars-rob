@@ -316,15 +316,37 @@ code {
   background: var(--ground);
   border: 1px solid var(--line);
   width: max-content;
+  margin-inline: auto;
+}
+
+.map-stage {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
 }
 
 .map-viewport {
   max-width: 100%;
   height: 500px;
-  overflow: auto;
+  overflow: hidden;
   overscroll-behavior: contain;
   border: 1px solid var(--line);
-  scrollbar-color: var(--soil-deep) var(--panel);
+  cursor: grab;
+  user-select: none;
+}
+
+.map-viewport.is-dragging,
+.map-viewport.is-dragging .cell {
+  cursor: grabbing;
+}
+
+.map-viewport .cell {
+  cursor: grab;
+}
+
+.map-help {
+  color: var(--muted);
+  font-size: 0.78rem;
 }
 
 .map-controls {
@@ -352,6 +374,7 @@ code {
 }
 
 .cell {
+  position: relative;
   display: grid;
   place-items: center;
   aspect-ratio: 1;
@@ -391,6 +414,21 @@ code {
 .cell-base {
   background: #d8b56f;
   color: #252c3f;
+}
+
+.cell-base-marker {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  display: grid;
+  place-items: center;
+  width: 0.9em;
+  height: 0.9em;
+  border-radius: 2px;
+  background: #d8b56f;
+  color: #252c3f;
+  font-size: 0.55em;
+  line-height: 1;
 }
 
 .cell-item-branch,
@@ -441,13 +479,14 @@ code {
 }
 
 .base-upgrades {
-  position: sticky;
+  position: absolute;
   top: 0.5rem;
+  left: 0.5rem;
   z-index: 15;
-  width: min(34rem, 100%);
-  max-height: 72vh;
+  width: min(34rem, calc(100% - 1rem));
+  max-height: min(72vh, 30rem);
   overflow-y: auto;
-  margin: 0.75rem 0;
+  margin: 0;
   padding: 0.8rem;
   border: 1px solid var(--soil);
   border-radius: 6px;
@@ -473,6 +512,29 @@ code {
 .base-upgrades ol li small { display: block; color: var(--muted); }
 .base-upgrades .upgrade-complete { color: var(--muted); }
 .base-upgrades > ul > li > button { padding: 0.25rem 0.55rem; font-size: 0.82rem; }
+
+.script-output {
+  margin-top: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.script-output > header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.45rem 0.7rem;
+  background: var(--ground);
+}
+.script-output h3 { margin: 0; font-size: 0.95rem; color: var(--soil); }
+.script-output > header button { padding: 0.2rem 0.5rem; font-size: 0.78rem; }
+.script-output-empty { margin: 0; padding: 0.65rem 0.75rem; color: var(--muted); font-size: 0.84rem; }
+.script-output ol { display: grid; gap: 0.35rem; max-height: 12rem; overflow: auto; margin: 0; padding: 0.6rem 0.75rem 0.6rem 2.3rem; }
+.script-output li { padding-left: 0.15rem; overflow-wrap: anywhere; }
+.script-output li small { display: inline-block; margin-right: 0.6rem; color: var(--muted); }
+.script-output li code { white-space: pre-wrap; }
 
 .upgrade-panel ul {
   display: grid;

@@ -19,12 +19,18 @@ export type Action =
         | 'recharge'
         // RN25: pega o item da casa / descarrega no armazém
         | 'collect'
+        | 'discardAll'
         | 'unload'
         // RN27: minera a jazida da frente
-        | 'mine';
+        | 'mine'
+        // RN30: corta a árvore à frente com machado
+        | 'chop';
     }
   // RN28
   | { kind: 'upgrade'; upgrade: UpgradeKind }
+  | { kind: 'discard'; item: ItemKind; count: number }
+  | { kind: 'discardWarehouse'; item: ItemKind; count: number }
+  | { kind: 'withdraw'; item: ItemKind; count: number }
   | { kind: 'shareMap'; to: number }
   // RN20: apaga o mapa do próprio robô
   | { kind: 'forgetMap' };

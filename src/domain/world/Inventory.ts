@@ -56,6 +56,11 @@ export class Inventory {
     return this.used + ITEM_SIZES[kind] <= this.#capacity;
   }
 
+  fitsCount(kind: ItemKind, count: number): boolean {
+    return Number.isInteger(count) && count >= 0 &&
+      this.used + ITEM_SIZES[kind] * count <= this.#capacity;
+  }
+
   add(kind: ItemKind): boolean {
     if (!this.fits(kind)) {
       return false;
@@ -90,6 +95,12 @@ export class Inventory {
       this.#counts[kind] -= items[kind] ?? 0;
     }
     return true;
+  }
+
+  clear(): ItemCounts {
+    const removed = this.counts();
+    for (const kind of ITEM_KINDS) this.#counts[kind] = 0;
+    return removed;
   }
 
   // Passa para `other` tudo o que couber, dos itens maiores para os menores.

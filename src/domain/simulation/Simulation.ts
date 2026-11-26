@@ -69,9 +69,15 @@ export type SimulationEvent = { tick: number; robot: number } & (
   | { kind: 'recharged'; added: number; battery: number }
   // RN25
   | { kind: 'collected'; item: ItemKind }
+  | { kind: 'discarded'; item: ItemKind; count: number }
+  | { kind: 'inventoryCleared'; count: number }
+  | { kind: 'warehouseDiscarded'; item: ItemKind; count: number }
+  | { kind: 'withdrawn'; item: ItemKind; count: number }
   | { kind: 'unloaded'; count: number }
   // RN27
   | { kind: 'mined'; item: ItemKind; at: Position; depleted: boolean }
+  | { kind: 'rockMined'; at: Position }
+  | { kind: 'chopped'; logs: number; wood?: ItemKind; at: Position }
   // RN28
   | { kind: 'upgraded'; upgrade: UpgradeKind; level: number }
   | { kind: 'failed'; action: ActionKind; reason: FailReason }
@@ -105,7 +111,12 @@ export const ACTION_COSTS: Readonly<Partial<Record<ActionKind, number>>> = {
   stepLeft: 1,
   shareMap: 1,
   collect: 1,
+  discard: 1,
+  discardAll: 1,
+  discardWarehouse: 1,
+  withdraw: 1,
   mine: 3,
+  chop: 3,
 };
 
 interface Running {
@@ -342,10 +353,57 @@ export class Simulation {
         return this.#recharge(id, robot);
       case 'collect':
         return this.#collect(id, robot);
+      case 'discard':
+        if (robot.cargo.count(action.item) < action.count) {
+          return this.#fail(id, 'discard', 'nothing');
+        }
+        if (
+          !this.world.placeItemsNearby(
+            robot.position,
+            Array.from({ length: action.count }, () => action.item),
+            (position) =>
+              this.fleet.robots.some((occupant) =>
+                occupant.position.equals(position),
+              ),
+          )
+        ) {
+          return this.#fail(id, 'discard', 'full');
+        }
+        robot.cargo.take({ [action.item]: action.count });
+        robot.refreshView();
+        this.#emit(id, { kind: 'discarded', item: action.item, count: action.count });
+        return true;
+      case 'discardAll': {
+        if (robot.cargo.isEmpty) return this.#fail(id, 'discardAll', 'empty');
+        const items = robot.cargo.list();
+        const count = items.length;
+        if (
+          !this.world.placeItemsNearby(
+            robot.position,
+            items,
+            (position) =>
+              this.fleet.robots.some((occupant) =>
+                occupant.position.equals(position),
+              ),
+          )
+        ) {
+          return this.#fail(id, 'discardAll', 'full');
+        }
+        robot.cargo.clear();
+        robot.refreshView();
+        this.#emit(id, { kind: 'inventoryCleared', count });
+        return true;
+      }
+      case 'withdraw':
+        return this.#withdraw(id, robot, action.item, action.count);
+      case 'discardWarehouse':
+        return this.#discardWarehouse(id, robot, action.item, action.count);
       case 'unload':
         return this.#unload(id, robot);
       case 'mine':
         return this.#mine(id, robot);
+      case 'chop':
+        return this.#chop(id, robot);
       case 'upgrade': {
         const result = purchaseUpgrade(this.world, robot, action.upgrade);
         if (!result.ok) {
@@ -448,6 +506,41 @@ export class Simulation {
     return true;
   }
 
+  #withdraw(id: number, robot: Robot, item: ItemKind, count: number): boolean {
+    if (!this.world.isBase(robot.position)) {
+      return this.#fail(id, 'withdraw', 'notAtBase');
+    }
+    if (this.world.warehouse.count(item) < count) {
+      return this.#fail(id, 'withdraw', 'nothing');
+    }
+    if (!robot.cargo.fitsCount(item, count)) {
+      return this.#fail(id, 'withdraw', 'full');
+    }
+    for (let index = 0; index < count; index++) robot.cargo.add(item);
+    this.world.warehouse.take({ [item]: count });
+    robot.refreshView();
+    this.#emit(id, { kind: 'withdrawn', item, count });
+    return true;
+  }
+
+  #discardWarehouse(id: number, robot: Robot, item: ItemKind, count: number): boolean {
+    if (!this.world.isBase(robot.position)) {
+      return this.#fail(id, 'discardWarehouse', 'notAtBase');
+    }
+    if (this.world.warehouse.count(item) < count) {
+      return this.#fail(id, 'discardWarehouse', 'nothing');
+    }
+    const dropped = Array.from({ length: count }, () => item);
+    const placed = this.world.placeItemsNearby(this.world.base, dropped, (position) =>
+      this.fleet.robots.some((occupant) => occupant.position.equals(position)),
+    );
+    if (!placed) return this.#fail(id, 'discardWarehouse', 'full');
+    this.world.warehouse.take({ [item]: count });
+    robot.refreshView();
+    this.#emit(id, { kind: 'warehouseDiscarded', item, count });
+    return true;
+  }
+
   // RN25: passa para o armazém tudo o que couber; true se o compartimento esvaziou
   #unload(id: number, robot: Robot): boolean {
     if (!this.world.isBase(robot.position)) {
@@ -461,7 +554,7 @@ export class Simulation {
       return this.#fail(id, 'unload', 'full');
     }
     this.#emit(id, { kind: 'unloaded', count });
-    return robot.cargo.isEmpty;
+    return true;
   }
 
   // RN27: minera a jazida da frente; o minério vai direto para o compartimento
@@ -470,24 +563,46 @@ export class Simulation {
       return this.#fail(id, 'mine', 'noTool');
     }
     const front = step(robot.position, toAbsolute(robot.orientation, 'N'));
-    if (!this.world.isOre(front)) {
-      return this.#fail(id, 'mine', 'nothing');
+    if (this.world.isOre(front)) {
+      const mineral = this.world.oreMineral(front);
+      const requiredLevel =
+        mineral === 'diamond' ? 4 : mineral === 'gold' ? 3 : mineral === 'iron' ? 2 : 1;
+      if (robot.pickaxeLevel < requiredLevel) return this.#fail(id, 'mine', 'noTool');
+      if (mineral === null) return this.#fail(id, 'mine', 'nothing');
+      if (!robot.cargo.fits(mineral)) {
+        return this.#fail(id, 'mine', 'full');
+      }
+      const result = this.world.mine(front);
+      if (result === null) return this.#fail(id, 'mine', 'nothing');
+      robot.cargo.add(result.item);
+      robot.refreshView();
+      this.#emit(id, {
+        kind: 'mined',
+        item: result.item,
+        at: front,
+        depleted: result.depleted,
+      });
+      return true;
     }
-    if (!robot.cargo.fits('iron')) {
-      return this.#fail(id, 'mine', 'full');
-    }
-    const result = this.world.mine(front);
-    if (result === null) {
-      return this.#fail(id, 'mine', 'nothing');
-    }
-    robot.cargo.add(result.item);
+    if (!this.world.mineRock(front)) return this.#fail(id, 'mine', 'nothing');
     robot.refreshView();
-    this.#emit(id, {
-      kind: 'mined',
-      item: result.item,
-      at: front,
-      depleted: result.depleted,
-    });
+    this.#emit(id, { kind: 'rockMined', at: front });
+    return true;
+  }
+
+  // RN30: corta a árvore à frente; cada casa dela deixa um tronco no chão.
+  #chop(id: number, robot: Robot): boolean {
+    if (!robot.hasAxe) return this.#fail(id, 'chop', 'noTool');
+    const front = step(robot.position, toAbsolute(robot.orientation, 'N'));
+    const treeWood = this.world.treeWood(front);
+    const requiredLevel =
+      treeWood === 'ancientWood' ? 3 : treeWood === 'hardwood' ? 2 : 1;
+    if (treeWood === null) return this.#fail(id, 'chop', 'nothing');
+    if (robot.axeLevel < requiredLevel) return this.#fail(id, 'chop', 'noTool');
+    const result = this.world.chop(front);
+    if (result === null) return this.#fail(id, 'chop', 'nothing');
+    robot.refreshView();
+    this.#emit(id, { kind: 'chopped', ...result, at: front });
     return true;
   }
 }

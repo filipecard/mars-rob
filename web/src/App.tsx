@@ -16,7 +16,7 @@ const CONNECTION_TEXT = {
 
 export function App() {
   const api = useMemo(() => new ApiClient(), []);
-  const { update, errors, connection, clearError } = useSimulation();
+  const { update, errors, outputs, connection, clearError, clearOutputs } = useSimulation();
   const [showReference, setShowReference] = useState(false);
   const [messages, setMessages] = useState<{ from: number; to: number; text: string; tick: number }[]>([]);
   useEffect(() => { void api.listMessages().then(setMessages).catch(() => undefined); }, [api]);
@@ -50,14 +50,6 @@ export function App() {
         </p>
       </header>
 
-      {update !== null && (
-        <BaseUpgradePanel
-          robots={update.state.robots.filter((robot) => robot.atBase)}
-          warehouse={update.state.warehouse.items}
-          api={api}
-        />
-      )}
-
       {update === null ? (
         <main className="waiting">
           <p>
@@ -77,11 +69,6 @@ export function App() {
               {update.state.fleet.robotCount === 1 ? 'robô' : 'robôs'}
             </p>
           </div>
-          <p className="warehouse-summary">
-            Armazém da base: {update.state.warehouse.used}/
-            {update.state.warehouse.capacity} espaços ·{' '}
-            {formatItems(update.state.warehouse.items)}
-          </p>
           <ProgressPanel state={update.state} />
           {update.state.robots.length > 1 && <MessagePanel robots={update.state.robots} messages={messages} onSend={async (from, to, text) => { setMessages(await api.sendMessage(from, to, text)); }} />}
           <main className="robots">
@@ -89,11 +76,14 @@ export function App() {
               <RobotPanel
                 key={robot.id}
                 robot={robot}
+                outputs={outputs}
                 api={api}
+                baseMenu={robot.atBase ? <BaseUpgradePanel robots={[robot]} warehouse={update.state.warehouse.items} api={api} /> : null}
                 runtimeError={errors.get(robot.id) ?? null}
                 onClearError={() => {
                   clearError(robot.id);
                 }}
+                onClearOutputs={clearOutputs}
               />
             ))}
           </main>
@@ -106,6 +96,7 @@ export function App() {
 
 const UPGRADE_LABELS: Record<UpgradeDTO, string> = {
   pickaxe: 'Picareta',
+  axe: 'Machado',
   battery: 'Bateria',
   cargo: 'Compartimento',
   vision: 'Visão',
@@ -116,7 +107,12 @@ const ITEM_NAMES: Record<string, string> = {
   branch: 'galhos',
   stone: 'pedras',
   log: 'troncos',
+  hardwood: 'madeira nobre',
+  ancientWood: 'madeira ancestral',
+  copper: 'cobre',
   iron: 'ferros',
+  gold: 'ouro',
+  diamond: 'diamantes',
 };
 
 function BaseUpgradePanel({

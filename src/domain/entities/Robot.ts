@@ -42,7 +42,7 @@ export interface RobotSettings {
 
 export const DEFAULT_ROBOT_SETTINGS: RobotSettings = {
   battery: 100,
-  cargo: 10,
+  cargo: 5,
   rechargeRate: 20,
   solarEvery: 5,
 };
@@ -91,6 +91,7 @@ export class Robot {
   readonly cargo: Inventory;
   readonly #levels: RobotLevels = {
     pickaxe: 0,
+    axe: 0,
     battery: 0,
     cargo: 0,
     vision: 0,
@@ -362,6 +363,18 @@ export class Robot {
 
   get hasPickaxe(): boolean {
     return this.#levels.pickaxe > 0;
+  }
+
+  get pickaxeLevel(): number {
+    return this.#levels.pickaxe;
+  }
+
+  get hasAxe(): boolean {
+    return this.#levels.axe > 0;
+  }
+
+  get axeLevel(): number {
+    return this.#levels.axe;
   }
 
   // Aplica a melhoria e devolve o novo nível (quem cobra e valida é purchaseUpgrade)
